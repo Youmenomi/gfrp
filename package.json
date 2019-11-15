@@ -1,0 +1,65 @@
+{
+  "name": "gfrp",
+  "version": "0.0.1",
+  "description": "Let different docs folders share the same assets.",
+  "keywords": [
+    "git-flow",
+    "release",
+    "standard-version",
+    "changelog",
+    "automatic"
+  ],
+  "author": "Dean Yao <youmenomi@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Youmenomi/gfrp"
+  },
+  "bin": "bin/cli.js",
+  "files": [
+    "dist/**/*",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit && eslint --ext .ts,.js ./src && rollup -c",
+    "test": "jest",
+    "link": "npm link && npm link typedoc-plugin-co-assets",
+    "unlink": "npm unlink typedoc-plugin-co-assets && npm unlink"
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-class-properties": "^7.5.5",
+    "@babel/plugin-proposal-decorators": "^7.6.0",
+    "@babel/preset-env": "^7.6.3",
+    "@babel/preset-typescript": "^7.6.0",
+    "@nuxtjs/eslint-config-typescript": "^0.1.2",
+    "@types/fs-extra": "^8.0.1",
+    "@types/jest": "^24.0.18",
+    "@types/prompts": "^2.0.3",
+    "babel-eslint": "^10.0.1",
+    "babel-jest": "^24.1.0",
+    "eslint": "^6.1.0",
+    "eslint-config-prettier": "^4.1.0",
+    "eslint-plugin-prettier": "^3.0.1",
+    "husky": "^2.6.0",
+    "jest": "^24.1.0",
+    "lint-staged": "^8.2.1",
+    "prettier": "^1.16.4",
+    "rollup": "^1.23.1",
+    "rollup-plugin-babel": "^4.3.3",
+    "rollup-plugin-commonjs": "^10.1.0",
+    "rollup-plugin-filesize": "^6.2.0",
+    "rollup-plugin-json": "^4.0.0",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-terser": "^5.1.2",
+    "ts-jest": "^24.0.2",
+    "typescript": "^3.6.4"
+  },
+  "dependencies": {
+    "conventional-changelog-angular": "^5.0.6",
+    "conventional-recommended-bump": "^6.0.4",
+    "parse-git-config": "^3.0.0",
+    "prompts": "^2.3.0",
+    "simple-git": "^1.126.0",
+    "standard-version": "^7.0.0"
+  }
+}
