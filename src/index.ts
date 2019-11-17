@@ -2,7 +2,7 @@ import { execSync } from 'child_process';
 // import conventionalRecommendedBump from 'conventional-recommended-bump';
 import parse from 'parse-git-config';
 import prompts from 'prompts';
-// import simplegit from 'simple-git/promise';
+import simplegit from 'simple-git/promise';
 
 // conventionalRecommendedBump(
 //   {
@@ -37,26 +37,29 @@ import prompts from 'prompts';
     }
   }
 
-  // const git = simplegit();
-  // const gitStatus = await git.status();
+  const git = simplegit();
+  const gitStatus = await git.status();
   // const currBranch = gitStatus.current;
+  console.log(gitStatus);
 
   const cc = {
     a: [
       {
         type: 'select',
-        name: '0',
+        name: 'version',
         message: 'Pick a color',
         choices: [
-          {
-            title: 'Red',
-            description: 'This option has a description',
-            value: '#ff0000'
-          },
-          { title: 'Green', value: '#00ff00', disabled: true },
-          { title: 'Blue', value: '#0000ff' }
+          { title: 'Release v1.0.0', value: 'v1.0.0' },
+          { title: 'Prerelease v1.0.0-beta.0', value: 'v1.0.0-beta.0' },
+          { title: 'Prerelease v1.0.0-rc.0', value: 'v1.0.0-rc.0' },
+          { title: 'Other (specify)', value: 'specify' },
         ],
         initial: 1
+      },
+      {
+        type: (prev) => (prev === 'specify' ? 'text' : null),
+        name: 'version',
+        message: 'enter the specify version',
       }
     ] as Array<prompts.PromptObject<string>>,
     b: [
@@ -75,9 +78,9 @@ import prompts from 'prompts';
     ] as Array<prompts.PromptObject<string>>
   };
 
-  const response = await prompts(cc.a);
+  // const response = await prompts(cc.a);
 
-  log('end.', response);
+  log('end.');
 })();
 
 function log(...arg: any[]) {

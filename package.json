@@ -21,6 +21,8 @@
     "LICENSE"
   ],
   "scripts": {
+    "cli": "node bin/cli.js",
+    "build:fast": "rollup -c",
     "build": "tsc --noEmit && eslint --ext .ts,.js ./src && rollup -c",
     "test": "jest",
     "link": "npm link && npm link typedoc-plugin-co-assets",

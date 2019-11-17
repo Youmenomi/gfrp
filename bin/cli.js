@@ -9,6 +9,7 @@ var path = _interopDefault(require('path'));
 var util$2 = _interopDefault(require('util'));
 var readline = _interopDefault(require('readline'));
 var events = _interopDefault(require('events'));
+var simplegit = _interopDefault(require('simple-git/promise'));
 
 function createCommonjsModule(fn, module) {
 	return module = { exports: {} }, fn(module, module.exports), module.exports;
@@ -5789,7 +5790,6 @@ var prompts$2 =
     ? dist
     : lib;
 
-// conventionalRecommendedBump(
 //   {
 //     preset: `angular`,
 //     tagPrefix: 'v'
@@ -5822,44 +5822,14 @@ var prompts$2 =
         stdio: 'inherit'
       });
     }
-  } // const git = simplegit();
-  // const gitStatus = await git.status();
-  // const currBranch = gitStatus.current;
+  }
 
+  const git = simplegit();
+  const gitStatus = await git.status(); // const currBranch = gitStatus.current;
 
-  const cc = {
-    a: [{
-      type: 'select',
-      name: '0',
-      message: 'Pick a color',
-      choices: [{
-        title: 'Red',
-        description: 'This option has a description',
-        value: '#ff0000'
-      }, {
-        title: 'Green',
-        value: '#00ff00',
-        disabled: true
-      }, {
-        title: 'Blue',
-        value: '#0000ff'
-      }],
-      initial: 1
-    }],
-    b: [{
-      type: 'confirm',
-      name: '0',
-      message: 'commit changes immediately?',
-      initial: true
-    }, {
-      type: prev => prev ? 'confirm' : null,
-      name: '1',
-      message: 'Push commits immediately?',
-      initial: false
-    }]
-  };
-  const response = await prompts$2(cc.a);
-  log('end.', response);
+  console.log(gitStatus);
+
+  log('end.');
 })();
 
 function log(...arg) {
