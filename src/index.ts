@@ -52,14 +52,14 @@ import simplegit from 'simple-git/promise';
           { title: 'Release v1.0.0', value: 'v1.0.0' },
           { title: 'Prerelease v1.0.0-beta.0', value: 'v1.0.0-beta.0' },
           { title: 'Prerelease v1.0.0-rc.0', value: 'v1.0.0-rc.0' },
-          { title: 'Other (specify)', value: 'specify' },
+          { title: 'Other (specify)', value: 'specify' }
         ],
         initial: 1
       },
       {
         type: (prev) => (prev === 'specify' ? 'text' : null),
         name: 'version',
-        message: 'enter the specify version',
+        message: 'enter the specify version'
       }
     ] as Array<prompts.PromptObject<string>>,
     b: [
