@@ -21,15 +21,20 @@ const build = (input, output, withMin = false) => {
     input,
     external: [
       'fs',
+      'fs-extra',
       'os',
       'path',
       'util',
       'readline',
       'events',
       'child_process',
-      'conventional-recommended-bump',
       'parse-git-config, prompts',
-      'simple-git/promise'
+      'simple-git/promise',
+      'chalk',
+      'matcher',
+      'standard-version/lib/lifecycles/bump',
+      'standard-version/lib/latest-semver-tag',
+      'p-iteration'
     ],
     plugins: [
       json(),

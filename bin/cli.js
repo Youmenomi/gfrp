@@ -3,13 +3,19 @@
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
 var child_process = require('child_process');
-var fs = _interopDefault(require('fs'));
-var os = _interopDefault(require('os'));
 var path = _interopDefault(require('path'));
+var fs = _interopDefault(require('fs-extra'));
+var fs$1 = _interopDefault(require('fs'));
+var os = _interopDefault(require('os'));
 var util$2 = _interopDefault(require('util'));
 var readline = _interopDefault(require('readline'));
 var events = _interopDefault(require('events'));
 var simplegit = _interopDefault(require('simple-git/promise'));
+var chalk = _interopDefault(require('chalk'));
+var matcher = _interopDefault(require('matcher'));
+var bump = _interopDefault(require('standard-version/lib/lifecycles/bump'));
+var latestSemverTag = _interopDefault(require('standard-version/lib/latest-semver-tag'));
+var pIteration = require('p-iteration');
 
 function createCommonjsModule(fn, module) {
 	return module = { exports: {} }, fn(module, module.exports), module.exports;
@@ -233,12 +239,12 @@ var gitConfigPath = function(type, options) {
     configPath = path.resolve(opts.cwd, '.git/config');
   }
 
-  if (!fs.existsSync(configPath)) {
+  if (!fs$1.existsSync(configPath)) {
     if (typeof opts.type === 'string') return null;
     configPath = path.join(os.homedir(), '.config/git/config');
   }
 
-  return fs.existsSync(configPath) ? configPath : null;
+  return fs$1.existsSync(configPath) ? configPath : null;
 };
 
 const expand = str => (str ? str.replace(/^~/, os.homedir()) : '');
@@ -284,8 +290,8 @@ const parse = (options, callback) => {
 
 parse.promise = options => {
   let filepath = parse.resolveConfigPath(options);
-  let read = util$2.promisify(fs.readFile);
-  let stat = util$2.promisify(fs.stat);
+  let read = util$2.promisify(fs$1.readFile);
+  let stat = util$2.promisify(fs$1.stat);
   if (!filepath) return Promise.resolve(null);
 
   return stat(filepath)
@@ -316,8 +322,8 @@ parse.promise = options => {
 parse.sync = options => {
   let filepath = parse.resolveConfigPath(options);
 
-  if (filepath && fs.existsSync(filepath)) {
-    let input = fs.readFileSync(filepath, 'utf8');
+  if (filepath && fs$1.existsSync(filepath)) {
+    let input = fs$1.readFileSync(filepath, 'utf8');
     if (options && options.include === true) {
       let cwd = path.resolve(path.dirname(filepath));
       input = injectInclude(input, cwd);
@@ -395,7 +401,7 @@ function injectInclude(input, cwd) {
     if (line.indexOf('[include]') === 0) {
       let filepath = lines[i + 1].replace(/^\s*path\s*=\s*/, '');
       let fp = path.resolve(cwd, expand(filepath));
-      res.push(fs.readFileSync(fp));
+      res.push(fs$1.readFileSync(fp));
     } else {
       res.push(line);
     }
@@ -5790,30 +5796,38 @@ var prompts$2 =
     ? dist
     : lib;
 
-//   {
-//     preset: `angular`,
-//     tagPrefix: 'v'
-//   },
-//   (error, recommendation) => {
-//     if (error) {
-//       // eslint-disable-next-line no-console
-//       console.log(error.message);
-//     } else {
-//       // eslint-disable-next-line no-console
-//       console.log(recommendation.releaseType);
-//     }
-//   }
-// );
-
 (async () => {
+  let pkg;
+  await pIteration.someSeries(bump.pkgFiles, async filename => {
+    const pkgPath = path.resolve(process.cwd(), filename);
+
+    try {
+      const data = await fs.readFile(pkgPath, 'utf8');
+      pkg = JSON.parse(data);
+    } catch (error) {}
+
+    return Boolean(pkg);
+  });
+  const currVersion = pkg ? pkg.version : await latestSemverTag();
+  log(`🏆  Release a standard-version${pkg ? ` of ${chalk.bold(pkg.name)} (currently at ${chalk.bold(pkg.version)})` : ''}
+    `);
+  const git = simplegit();
+  const gitStatus = await git.status();
+  let currentBranch = gitStatus.current;
+  currentBranch = 'develop'; // if (gitStatus.files.length !== 0) {
+  //   throw new Error(
+  //     'failed: working dir must be clean. Please stage and commit your changes.'
+  //   );
+  // }
+
   const GIT_CONFIG = await parseGitConfig();
-  const isGitFlowInit = Boolean(GIT_CONFIG['gitflow "branch"']); // log(GIT_CONFIG);
+  const isGitFlowInit = Boolean(GIT_CONFIG['gitflow "branch"']); // console.log(GIT_CONFIG);
 
   if (!isGitFlowInit) {
     const response = await prompts$2({
       type: 'confirm',
       name: 'value',
-      message: 'Git flow is not installed. Do you want to install it?',
+      message: 'Detected that Git flow is not installed. Do you want to install it?',
       initial: true
     });
 
@@ -5822,18 +5836,206 @@ var prompts$2 =
         stdio: 'inherit'
       });
     }
+  } //   [gitflow "branch"]
+  // 	master = master
+  // 	develop = develop
+  // [gitflow "prefix"]
+  // 	feature = feature/
+  // 	release = release/
+  // 	hotfix = hotfix/
+  // 	support = support/
+  //   versiontag = v
+  // const gitflow = {
+  //   branch: { master: 'master', develop: 'develop' },
+  //   prefix: {
+  //     feature: 'feature/',
+  //     release: 'release/',
+  //     hotfix: 'hotfix/',
+  //     support: 'support/',
+  //     versiontag: 'v'
+  //   }
+  // };
+
+
+  const questions = [];
+  const branchConfig = {
+    master: 'You should not release directly on the master branch.',
+    develop: {
+      prerelease: 'alpha'
+    },
+    'feature/*': [{
+      prerelease: 'alpha'
+    }, {
+      prerelease: '%r'
+    }],
+    'release/*': [{
+      release: true
+    }, {
+      prerelease: 'beta'
+    }, {
+      prerelease: 'rc'
+    }],
+    'hotfix/*': [{
+      release: true
+    }, {
+      prerelease: 'beta'
+    }, {
+      prerelease: 'rc'
+    }]
+  };
+  let configName;
+  Object.keys(branchConfig).some(value => {
+    if (matcher.isMatch(currentBranch, value)) configName = value;
+  });
+  const PROMPT_SPECIFY = {
+    type: prev => !prev ? 'text' : prev === 'specify' ? 'text' : null,
+    name: 'version',
+    message: 'enter the specify version'
+  };
+  const PROMPT_COMMIT = {
+    type: 'confirm',
+    name: 'isCommit',
+    message: 'commit',
+    initial: true
+  };
+  const PROMPT_PUSH = {
+    type: 'confirm',
+    name: 'isPush',
+    message: 'push',
+    initial: false
+  };
+
+  const createChoice = async (config, configName) => {
+    if (config.release !== true && typeof config.prerelease !== 'string') {
+      throw new Error('The release policy of the branch is incorrect.');
+    }
+
+    const args = {};
+    args.silent = true;
+    args.dryRun = true;
+    args.skip = {};
+    args.skip.changelog = true;
+
+    if (config.prerelease) {
+      let prerelease = config.prerelease;
+
+      if (config.prerelease.includes('%r')) {
+        const r = currentBranch.substr(configName.split('*')[0].length);
+        prerelease = prerelease.replace(/%r/g, r);
+      }
+
+      if (config.prerelease.includes('%h')) {
+        const h = child_process.execSync('git log --format="%H" -n 1').toString().substr(0, 7);
+        prerelease = prerelease.replace(/%h/g, h);
+      }
+
+      args.prerelease = prerelease;
+    } // args.tagPrefix = 'v';
+    // args.releaseAs = '2.0.0';
+    // args.firstRelease = true;
+
+
+    let newVersion = await bump(args, currVersion);
+
+    if (args.prerelease && config.prerelease.includes('%h')) {
+      const i = newVersion.lastIndexOf('.');
+      newVersion = newVersion.substr(0, i);
+    }
+
+    return {
+      title: `${config.release ? chalk.red('release') : chalk.yellow('prerelease')} (${newVersion})`,
+      value: newVersion
+    }; // if (config.release) {
+    //   // version = "1.0.1-rc.0"
+    //   //   args = {}
+    //   //   args.silent = true
+    //   //   args.dryRun = true
+    //   //   args.skip = {}
+    //   //   args.skip.changelog = true
+    //   //   args.releaseAs = '2.0.0'
+    //   //   // args.firstRelease = true
+    //   //   args.prerelease = 'alpha'
+    //   // bump();
+    //   const args: any = {};
+    //   args.silent = true;
+    //   args.dryRun = true;
+    //   args.skip = {};
+    //   args.skip.changelog = true;
+    //   args.tagPrefix = '';
+    //   args.releaseAs = '2.0.0';
+    //   // args.firstRelease = true
+    //   args.prerelease = 'alpha';
+    //   const newVersion = bump(args, currVersion);
+    //   return { title: `Release ${newVersion}`, value: newVersion };
+    // } else if (config.prerelease) {
+    //   return {
+    //     title: 'Prerelease v1.1.0-alpha.0',
+    //     value: 'v1.1.0-alpha.0'
+    //   };
+    // } else {
+    //   return {
+    //     title: 'Prerelease none',
+    //     value: 'none'
+    //   };
+    // }
+  };
+
+  const getChoices = async (config, configName) => {
+    const choices = [];
+
+    if (Array.isArray(config)) {
+      await pIteration.forEachSeries(config, async value => {
+        choices.push((await createChoice(value, configName)));
+      });
+    } else {
+      choices.push((await createChoice(config, configName)));
+    }
+
+    choices.push({
+      title: 'Other (specify)',
+      value: 'specify'
+    });
+    return choices;
+  };
+
+  if (configName === undefined) {
+    questions.push(PROMPT_SPECIFY);
+  } else if (typeof branchConfig[configName] === 'string') {
+    throw new TypeError(`failed: ${branchConfig[configName]}`);
+  } else {
+    questions.push({
+      type: 'select',
+      name: 'version',
+      message: 'Select or specify new version',
+      choices: await getChoices(branchConfig[configName], configName),
+      initial: 0
+    }, PROMPT_SPECIFY);
   }
 
-  const git = simplegit();
-  const gitStatus = await git.status(); // const currBranch = gitStatus.current;
-
-  console.log(gitStatus);
-
-  log('end.');
-})();
+  questions.push(PROMPT_COMMIT, PROMPT_PUSH);
+  const response = await prompts$2(questions);
+  child_process.execSync(`npx release-it --increment ${response.version}`, {
+    stdio: 'inherit'
+  });
+  log('end.', response.version);
+})().catch(error => {
+  console.log(chalk.red(error.message));
+  console.log(error.stack);
+});
 
 function log(...arg) {
   // eslint-disable-next-line no-console
-  console.log('[cli.js]', ...arg);
-}
+  console.log(...arg);
+} // args.silent = true
+//   args.dryRun = true
+//   args.skip.changelog = true
+//   version = "1.0.1-rc.0"
+//   args = {}
+//   args.silent = true
+//   args.dryRun = true
+//   args.skip = {}
+//   args.skip.changelog = true
+//   args.releaseAs = '2.0.0'
+//   // args.firstRelease = true
+//   args.prerelease = 'alpha'
 //# sourceMappingURL=cli.js.map

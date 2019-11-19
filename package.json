@@ -23,6 +23,8 @@
   "scripts": {
     "cli": "node bin/cli.js",
     "build:fast": "rollup -c",
+    "dev:fast": "npm run build:fast && node bin/cli.js",
+    "dev:cli": "node bin/cli.js",
     "build": "tsc --noEmit && eslint --ext .ts,.js ./src && rollup -c",
     "test": "jest",
     "link": "npm link && npm link typedoc-plugin-co-assets",
@@ -57,11 +59,15 @@
     "typescript": "^3.6.4"
   },
   "dependencies": {
-    "conventional-changelog-angular": "^5.0.6",
-    "conventional-recommended-bump": "^6.0.4",
+    "@types/semver": "^6.2.0",
+    "fs-extra": "^8.1.0",
+    "matcher": "^2.1.0",
+    "p-iteration": "^1.1.8",
     "parse-git-config": "^3.0.0",
     "prompts": "^2.3.0",
+    "release-it": "^12.4.3",
+    "semver": "^6.3.0",
     "simple-git": "^1.126.0",
-    "standard-version": "^7.0.0"
+    "standard-version": "^7.0.1"
   }
 }
