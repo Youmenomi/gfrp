@@ -91,7 +91,7 @@ dotenv.config();
   type iConfig = { release?: boolean; prerelease?: string; options?: any };
   const branchConfig: { [key: string]: string | iConfig | iConfig[] } = {
     master: 'You should not release directly on the master branch.',
-    develop: { prerelease: 'alpha' },
+    develop: [{ prerelease: 'alpha' }, { prerelease: '%h' }],
     'feature/*': [{ prerelease: 'alpha' }, { prerelease: '%r' }],
     'release/*': [
       { release: true },

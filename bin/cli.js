@@ -5980,9 +5980,11 @@ main$2.config();
   const questions = [];
   const branchConfig = {
     master: 'You should not release directly on the master branch.',
-    develop: {
+    develop: [{
       prerelease: 'alpha'
-    },
+    }, {
+      prerelease: '%h'
+    }],
     'feature/*': [{
       prerelease: 'alpha'
     }, {
