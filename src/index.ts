@@ -244,9 +244,12 @@ import { someSeries, forEachSeries } from 'p-iteration';
   questions.push(PROMPT_COMMIT, PROMPT_PUSH);
   const response = await prompts(questions);
 
-  execSync(`npx release-it --increment ${response.version}`, {
+  execSync(`npx release-it`, {
     stdio: 'inherit'
   });
+  // execSync(`npx np --no-publish`, {
+  //   stdio: 'inherit'
+  // });
 
   log('end.', response.version);
 })().catch((error) => {

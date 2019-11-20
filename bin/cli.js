@@ -6014,9 +6014,12 @@ var prompts$2 =
 
   questions.push(PROMPT_COMMIT, PROMPT_PUSH);
   const response = await prompts$2(questions);
-  child_process.execSync(`npx release-it --increment ${response.version}`, {
+  child_process.execSync(`npx release-it`, {
     stdio: 'inherit'
-  });
+  }); // execSync(`npx np --no-publish`, {
+  //   stdio: 'inherit'
+  // });
+
   log('end.', response.version);
 })().catch(error => {
   console.log(chalk.red(error.message));
