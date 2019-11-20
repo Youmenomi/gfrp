@@ -5915,6 +5915,11 @@ var main$2 = {
 	parse: parse_1
 };
 
+const runTasks = require('release-it/lib/tasks');
+
+const Version = require('release-it/lib/plugin/version/Version'); // const Version = require('release-it/lib/plugin/version/Version');
+
+
 main$2.config();
 (async () => {
   let pkg;
@@ -6135,9 +6140,36 @@ main$2.config();
   }
 
   questions.push(PROMPT_COMMIT, PROMPT_PUSH);
-  const response = await prompts$2(questions);
-  child_process.execSync(`npx release-it --increment ${response.version} --github.release --npm.tag=rc --preRelease`, {
-    stdio: 'inherit'
+  const response = await prompts$2(questions); // execSync(
+  //   `npx release-it --increment ${response.version} --github.release --npm.tag=rc --preRelease --no-git.requireCleanWorkingDir`,
+  //   {
+  //     stdio: 'inherit'
+  //   }
+  // );
+
+  Version.prototype.incrementVersion = () => {
+    return response.version;
+  }; // Object.defineProperty(
+  //   Version,
+  //   'assetsUrl',
+  //   Object.getOwnPropertyDescriptor(CoAssetsPlugin.prototype, 'assetsUrl')!
+  // );
+
+
+  await runTasks({
+    increment: response.version,
+    github: {
+      release: true
+    },
+    npm: {
+      tag: 'rc'
+    },
+    preRelease: true,
+    dryRun: false,
+    verbose: 0,
+    git: {
+      requireCleanWorkingDir: false
+    }
   }); // execSync(`npx np --no-publish`, {
   //   stdio: 'inherit'
   // });
@@ -6163,4 +6195,10 @@ function log$1(...arg) {
 //   args.releaseAs = '2.0.0'
 //   // args.firstRelease = true
 //   args.prerelease = 'alpha'
+
+
+process.on('SIGINT', function () {
+  console.log('Exit now!');
+  process.exit();
+});
 //# sourceMappingURL=cli.js.map

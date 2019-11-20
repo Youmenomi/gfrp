@@ -12,7 +12,12 @@ import latestSemverTag from 'standard-version/lib/latest-semver-tag';
 import { someSeries, forEachSeries } from 'p-iteration';
 // import semver from 'semver';
 import dotenv from 'dotenv';
+const runTasks = require('release-it/lib/tasks');
+const Version = require('release-it/lib/plugin/version/Version');
+// const Version = require('release-it/lib/plugin/version/Version');
+
 dotenv.config();
+
 (async () => {
   let pkg: { name: string; version: string } | undefined;
   await someSeries(bump.pkgFiles, async (filename) => {
@@ -245,12 +250,33 @@ dotenv.config();
   questions.push(PROMPT_COMMIT, PROMPT_PUSH);
   const response = await prompts(questions);
 
-  execSync(
-    `npx release-it --increment ${response.version} --github.release --npm.tag=rc --preRelease`,
-    {
-      stdio: 'inherit'
-    }
-  );
+  // execSync(
+  //   `npx release-it --increment ${response.version} --github.release --npm.tag=rc --preRelease --no-git.requireCleanWorkingDir`,
+  //   {
+  //     stdio: 'inherit'
+  //   }
+  // );
+
+  Version.prototype.incrementVersion = () => {
+    return response.version;
+  };
+
+  // Object.defineProperty(
+  //   Version,
+  //   'assetsUrl',
+  //   Object.getOwnPropertyDescriptor(CoAssetsPlugin.prototype, 'assetsUrl')!
+  // );
+
+  await runTasks({
+    increment: response.version,
+    github: { release: true },
+    npm: { tag: 'rc' },
+    preRelease: true,
+    dryRun: false,
+    verbose: 0,
+    git: { requireCleanWorkingDir: false }
+  });
+
   // execSync(`npx np --no-publish`, {
   //   stdio: 'inherit'
   // });
@@ -279,3 +305,8 @@ function log(...arg: any[]) {
 //   args.releaseAs = '2.0.0'
 //   // args.firstRelease = true
 //   args.prerelease = 'alpha'
+
+process.on('SIGINT', function() {
+  console.log('Exit now!');
+  process.exit();
+});
