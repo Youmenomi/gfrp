@@ -5796,6 +5796,126 @@ var prompts$2 =
     ? dist
     : lib;
 
+/* @flow */
+/*::
+
+type DotenvParseOptions = {
+  debug?: boolean
+}
+
+// keys and values from src
+type DotenvParseOutput = { [string]: string }
+
+type DotenvConfigOptions = {
+  path?: string, // path to .env file
+  encoding?: string, // encoding of .env file
+  debug?: string // turn on logging for debugging purposes
+}
+
+type DotenvConfigOutput = {
+  parsed?: DotenvParseOutput,
+  error?: Error
+}
+
+*/
+
+
+
+
+function log (message /*: string */) {
+  console.log(`[dotenv][DEBUG] ${message}`);
+}
+
+const NEWLINE = '\n';
+const RE_INI_KEY_VAL = /^\s*([\w.-]+)\s*=\s*(.*)?\s*$/;
+const RE_NEWLINES = /\\n/g;
+const NEWLINES_MATCH = /\n|\r|\r\n/;
+
+// Parses src into an Object
+function parse$1 (src /*: string | Buffer */, options /*: ?DotenvParseOptions */) /*: DotenvParseOutput */ {
+  const debug = Boolean(options && options.debug);
+  const obj = {};
+
+  // convert Buffers before splitting into lines and processing
+  src.toString().split(NEWLINES_MATCH).forEach(function (line, idx) {
+    // matching "KEY' and 'VAL' in 'KEY=VAL'
+    const keyValueArr = line.match(RE_INI_KEY_VAL);
+    // matched?
+    if (keyValueArr != null) {
+      const key = keyValueArr[1];
+      // default undefined or missing values to empty string
+      let val = (keyValueArr[2] || '');
+      const end = val.length - 1;
+      const isDoubleQuoted = val[0] === '"' && val[end] === '"';
+      const isSingleQuoted = val[0] === "'" && val[end] === "'";
+
+      // if single or double quoted, remove quotes
+      if (isSingleQuoted || isDoubleQuoted) {
+        val = val.substring(1, end);
+
+        // if double quoted, expand newlines
+        if (isDoubleQuoted) {
+          val = val.replace(RE_NEWLINES, NEWLINE);
+        }
+      } else {
+        // remove surrounding whitespace
+        val = val.trim();
+      }
+
+      obj[key] = val;
+    } else if (debug) {
+      log(`did not match key and value when parsing line ${idx + 1}: ${line}`);
+    }
+  });
+
+  return obj
+}
+
+// Populates process.env from .env file
+function config (options /*: ?DotenvConfigOptions */) /*: DotenvConfigOutput */ {
+  let dotenvPath = path.resolve(process.cwd(), '.env');
+  let encoding /*: string */ = 'utf8';
+  let debug = false;
+
+  if (options) {
+    if (options.path != null) {
+      dotenvPath = options.path;
+    }
+    if (options.encoding != null) {
+      encoding = options.encoding;
+    }
+    if (options.debug != null) {
+      debug = true;
+    }
+  }
+
+  try {
+    // specifying an encoding returns a string instead of a buffer
+    const parsed = parse$1(fs$1.readFileSync(dotenvPath, { encoding }), { debug });
+
+    Object.keys(parsed).forEach(function (key) {
+      if (!Object.prototype.hasOwnProperty.call(process.env, key)) {
+        process.env[key] = parsed[key];
+      } else if (debug) {
+        log(`"${key}" is already defined in \`process.env\` and will not be overwritten`);
+      }
+    });
+
+    return { parsed }
+  } catch (e) {
+    return { error: e }
+  }
+}
+
+var config_1 = config;
+var parse_1 = parse$1;
+
+var main$2 = {
+	config: config_1,
+	parse: parse_1
+};
+
+main$2.config();
 (async () => {
   let pkg;
   await pIteration.someSeries(bump.pkgFiles, async filename => {
@@ -5809,7 +5929,7 @@ var prompts$2 =
     return Boolean(pkg);
   });
   const currVersion = pkg ? pkg.version : await latestSemverTag();
-  log(`🏆  Release a standard-version${pkg ? ` of ${chalk.bold(pkg.name)} (currently at ${chalk.bold(pkg.version)})` : ''}
+  log$1(`🏆  Release a standard-version${pkg ? ` of ${chalk.bold(pkg.name)} (currently at ${chalk.bold(pkg.version)})` : ''}
     `);
   const git = simplegit();
   const gitStatus = await git.status();
@@ -6014,19 +6134,19 @@ var prompts$2 =
 
   questions.push(PROMPT_COMMIT, PROMPT_PUSH);
   const response = await prompts$2(questions);
-  child_process.execSync(`npx release-it`, {
+  child_process.execSync(`npx release-it ${response.version} --github.release`, {
     stdio: 'inherit'
   }); // execSync(`npx np --no-publish`, {
   //   stdio: 'inherit'
   // });
 
-  log('end.', response.version);
+  log$1('end.', response.version);
 })().catch(error => {
   console.log(chalk.red(error.message));
   console.log(error.stack);
 });
 
-function log(...arg) {
+function log$1(...arg) {
   // eslint-disable-next-line no-console
   console.log(...arg);
 } // args.silent = true

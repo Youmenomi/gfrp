@@ -11,7 +11,8 @@ import bump from 'standard-version/lib/lifecycles/bump';
 import latestSemverTag from 'standard-version/lib/latest-semver-tag';
 import { someSeries, forEachSeries } from 'p-iteration';
 // import semver from 'semver';
-
+import dotenv from 'dotenv';
+dotenv.config();
 (async () => {
   let pkg: { name: string; version: string } | undefined;
   await someSeries(bump.pkgFiles, async (filename) => {
@@ -244,7 +245,7 @@ import { someSeries, forEachSeries } from 'p-iteration';
   questions.push(PROMPT_COMMIT, PROMPT_PUSH);
   const response = await prompts(questions);
 
-  execSync(`npx release-it`, {
+  execSync(`npx release-it ${response.version} --github.release`, {
     stdio: 'inherit'
   });
   // execSync(`npx np --no-publish`, {

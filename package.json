@@ -60,6 +60,7 @@
   },
   "dependencies": {
     "@types/semver": "^6.2.0",
+    "dotenv": "^8.2.0",
     "fs-extra": "^8.1.0",
     "matcher": "^2.1.0",
     "np": "^5.1.3",
