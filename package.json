@@ -1,6 +1,6 @@
 {
   "name": "gfrp",
-  "version": "0.0.0-a123",
+  "version": "0.0.0-b123",
   "description": "Let different docs folders share the same assets.",
   "keywords": [
     "git-flow",
@@ -36,6 +36,7 @@
     "@babel/preset-env": "^7.6.3",
     "@babel/preset-typescript": "^7.6.0",
     "@nuxtjs/eslint-config-typescript": "^0.1.2",
+    "@release-it/conventional-changelog": "^1.1.0",
     "@types/fs-extra": "^8.0.1",
     "@types/jest": "^24.0.18",
     "@types/prompts": "^2.0.3",

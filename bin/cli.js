@@ -6169,6 +6169,12 @@ main$2.config();
     verbose: 0,
     git: {
       requireCleanWorkingDir: false
+    },
+    plugins: {
+      '@release-it/conventional-changelog': {
+        preset: 'angular',
+        infile: 'CHANGELOG.md'
+      }
     }
   }); // execSync(`npx np --no-publish`, {
   //   stdio: 'inherit'
