@@ -246,7 +246,7 @@ dotenv.config();
   const response = await prompts(questions);
 
   execSync(
-    `npx release-it --increment ${response.version} --github.release --npm.tag=rc`,
+    `npx release-it --increment ${response.version} --github.release --npm.tag=rc --preRelease`,
     {
       stdio: 'inherit'
     }

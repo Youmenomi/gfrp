@@ -6136,7 +6136,7 @@ main$2.config();
 
   questions.push(PROMPT_COMMIT, PROMPT_PUSH);
   const response = await prompts$2(questions);
-  child_process.execSync(`npx release-it --increment ${response.version} --github.release --npm.tag=rc`, {
+  child_process.execSync(`npx release-it --increment ${response.version} --github.release --npm.tag=rc --preRelease`, {
     stdio: 'inherit'
   }); // execSync(`npx np --no-publish`, {
   //   stdio: 'inherit'
