@@ -245,9 +245,12 @@ dotenv.config();
   questions.push(PROMPT_COMMIT, PROMPT_PUSH);
   const response = await prompts(questions);
 
-  execSync(`npx release-it --increment ${response.version} --github.release`, {
-    stdio: 'inherit'
-  });
+  execSync(
+    `npx release-it --increment ${response.version} --github.release --npm.tag=rc`,
+    {
+      stdio: 'inherit'
+    }
+  );
   // execSync(`npx np --no-publish`, {
   //   stdio: 'inherit'
   // });
