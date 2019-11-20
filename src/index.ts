@@ -274,7 +274,7 @@ dotenv.config();
     preRelease: true,
     dryRun: false,
     verbose: 0,
-    git: { requireCleanWorkingDir: false },
+    // git: { requireCleanWorkingDir: false },
     plugins: {
       '@release-it/conventional-changelog': {
         preset: 'angular',
