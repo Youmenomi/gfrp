@@ -1,6 +1,6 @@
 {
   "name": "gfrp",
-  "version": "0.0.0-b123",
+  "version": "0.4.12",
   "description": "Let different docs folders share the same assets.",
   "keywords": [
     "git-flow",
@@ -28,7 +28,8 @@
     "build": "tsc --noEmit && eslint --ext .ts,.js ./src && rollup -c",
     "test": "jest",
     "link": "npm link && npm link typedoc-plugin-co-assets",
-    "unlink": "npm unlink typedoc-plugin-co-assets && npm unlink"
+    "unlink": "npm unlink typedoc-plugin-co-assets && npm unlink",
+    "debug": "node --nolazy --inspect-brk=9229 bin/cli.js"
   },
   "devDependencies": {
     "@babel/plugin-proposal-class-properties": "^7.5.5",

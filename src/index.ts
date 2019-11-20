@@ -14,6 +14,7 @@ import { someSeries, forEachSeries } from 'p-iteration';
 import dotenv from 'dotenv';
 const runTasks = require('release-it/lib/tasks');
 const Version = require('release-it/lib/plugin/version/Version');
+const Git = require('release-it/lib/plugin/git/Git');
 // const Version = require('release-it/lib/plugin/version/Version');
 
 dotenv.config();
@@ -257,8 +258,42 @@ dotenv.config();
   //   }
   // );
 
-  Version.prototype.incrementVersion = () => {
-    return response.version;
+  // Version.prototype.incrementVersion = () => {
+  //   return response.version;
+  // };
+
+  // Git.prototype.commit = funciton({ message = this.options.commitMessage, args = this.options.commitArgs } = {}) {
+  //   return this.exec(`git commit --message="${message}" ${args || ''}`).then(
+  //     () => this.setContext({ isCommitted: true }),
+  //     err => {
+  //       this.debug(err);
+  //       if (/nothing (added )?to commit/.test(err)) {
+  //         this.log.warn('No changes to commit. The latest commit will be tagged.');
+  //       } else {
+  //         throw new GitCommitError(err);
+  //       }
+  //     }
+  //   );
+  // }
+
+  Git.prototype.commit = function({
+    message = this.options.commitMessage,
+    args = this.options.commitArgs
+  } = {}) {
+    console.log('!!!!');
+    return this.exec(`git commit --message="${message}" ${args || ''}`).then(
+      () => this.setContext({ isCommitted: true }),
+      (err) => {
+        this.debug(err);
+        if (/nothing (added )?to commit/.test(err)) {
+          this.log.warn(
+            'No changes to commit. The latest commit will be tagged.'
+          );
+        } else {
+          throw new GitCommitError(err);
+        }
+      }
+    );
   };
 
   // Object.defineProperty(
@@ -268,19 +303,26 @@ dotenv.config();
   // );
 
   await runTasks({
-    increment: response.version,
+    // increment: response.version,
     github: { release: true },
     npm: { tag: 'rc' },
-    preRelease: true,
+    // preRelease: true,
+    // preReleaseId: 'rc',
     dryRun: false,
     verbose: 0,
-    // git: { requireCleanWorkingDir: false },
-    plugins: {
-      '@release-it/conventional-changelog': {
-        preset: 'angular',
-        infile: 'CHANGELOG.md'
-      }
-    }
+    commit: false,
+    git: { requireCleanWorkingDir: false }
+    // plugins: {
+    //   Git: {
+    //     commit: false
+    //   }
+    // }
+    // plugins: {
+    //   '@release-it/conventional-changelog': {
+    //     preset: 'angular',
+    //     infile: 'CHANGELOG.md'
+    //   }
+    // }
   });
 
   // execSync(`npx np --no-publish`, {
