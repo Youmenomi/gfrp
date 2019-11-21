@@ -65,5 +65,9 @@ export default [].concat(
   build('./src/index.ts', {
     file: bin,
     format: 'cjs'
+  }),
+  build('./src/gitflow/index.ts', {
+    file: 'bin/gitflow/index.js',
+    format: 'cjs'
   })
 )

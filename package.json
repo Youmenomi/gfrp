@@ -1,6 +1,6 @@
 {
   "name": "gfrp",
-  "version": "0.4.12",
+  "version": "1.2.3",
   "description": "Let different docs folders share the same assets.",
   "keywords": [
     "git-flow",

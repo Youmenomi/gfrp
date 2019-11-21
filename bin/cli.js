@@ -5922,6 +5922,8 @@ const Version = require('release-it/lib/plugin/version/Version');
 const Git = require('release-it/lib/plugin/git/Git'); // const Version = require('release-it/lib/plugin/version/Version');
 
 
+const npm = require('release-it/lib/plugin/npm/npm');
+
 main$2.config();
 (async () => {
   let pkg;
@@ -5988,7 +5990,10 @@ main$2.config();
   const branchConfig = {
     master: 'You should not release directly on the master branch.',
     develop: [{
-      prerelease: 'alpha'
+      prerelease: 'alpha',
+      npm: {
+        tag: ['alpha', 'next']
+      }
     }, {
       prerelease: '%h'
     }],
@@ -6151,42 +6156,45 @@ main$2.config();
   // Version.prototype.incrementVersion = () => {
   //   return response.version;
   // };
-  // Git.prototype.commit = funciton({ message = this.options.commitMessage, args = this.options.commitArgs } = {}) {
-  //   return this.exec(`git commit --message="${message}" ${args || ''}`).then(
-  //     () => this.setContext({ isCommitted: true }),
-  //     err => {
-  //       this.debug(err);
-  //       if (/nothing (added )?to commit/.test(err)) {
-  //         this.log.warn('No changes to commit. The latest commit will be tagged.');
-  //       } else {
-  //         throw new GitCommitError(err);
+  // Git.prototype.release = async function() {
+  //   const { commit, tag, push } = this.options;
+  //   console.log(this.options);
+  //   await this.step({
+  //     enabled: commit,
+  //     task: () => this.commit(),
+  //     label: 'Git commit',
+  //     prompt: 'commit'
+  //   });
+  //   await this.step({
+  //     enabled: tag,
+  //     task: () => this.tag(),
+  //     label: 'Git tag',
+  //     prompt: 'tag'
+  //   });
+  //   await this.step({
+  //     enabled: push,
+  //     task: () => this.push(),
+  //     label: 'Git push',
+  //     prompt: 'push'
+  //   });
+  // };
+
+  console.log(child_process.execSync(`npm view react dist-tags --json`).toString()); // npm.prototype.getRegistryPreReleaseTags = function() {
+  //   return this.exec(`npm view ${this.getName()} dist-tags --json`, {
+  //     options
+  //   }).then(
+  //     (output) => {
+  //       try {
+  //         const tags = JSON.parse(output);
+  //         return Object.keys(tags).filter((tag) => tag !== DEFAULT_TAG);
+  //       } catch (err) {
+  //         this.debug(err);
+  //         return [];
   //       }
-  //     }
+  //     },
+  //     () => []
   //   );
-  // }
-
-  Git.prototype.commit = function ({
-    message = this.options.commitMessage,
-    args = this.options.commitArgs
-  } = {}) {
-    console.log('!!!!');
-    return this.exec(`git commit --message="${message}" ${args || ''}`).then(() => this.setContext({
-      isCommitted: true
-    }), err => {
-      this.debug(err);
-
-      if (/nothing (added )?to commit/.test(err)) {
-        this.log.warn('No changes to commit. The latest commit will be tagged.');
-      } else {
-        throw new GitCommitError(err);
-      }
-    });
-  }; // Object.defineProperty(
-  //   Version,
-  //   'assetsUrl',
-  //   Object.getOwnPropertyDescriptor(CoAssetsPlugin.prototype, 'assetsUrl')!
-  // );
-
+  // };
 
   await runTasks({
     // increment: response.version,
@@ -6202,13 +6210,41 @@ main$2.config();
     verbose: 0,
     commit: false,
     git: {
-      requireCleanWorkingDir: false
+      requireCleanWorkingDir: false,
+      commit: false
+    },
+    plugins: {
+      [path.resolve('./bin/gitflow')]: {
+        master: 'You should not release directly on the master branch.',
+        develop: [{
+          prerelease: 'alpha',
+          npm: {
+            tag: ['alpha', 'next']
+          }
+        }, {
+          prerelease: '%h'
+        }],
+        'feature/*': [{
+          prerelease: 'alpha'
+        }, {
+          prerelease: '%r'
+        }],
+        'release/*': [{
+          release: true
+        }, {
+          prerelease: 'beta'
+        }, {
+          prerelease: 'rc'
+        }],
+        'hotfix/*': [{
+          release: true
+        }, {
+          prerelease: 'beta'
+        }, {
+          prerelease: 'rc'
+        }]
+      }
     } // plugins: {
-    //   Git: {
-    //     commit: false
-    //   }
-    // }
-    // plugins: {
     //   '@release-it/conventional-changelog': {
     //     preset: 'angular',
     //     infile: 'CHANGELOG.md'
