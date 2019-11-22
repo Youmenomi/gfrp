@@ -1,8 +1,11 @@
 // import { Plugin } from 'release-it';
 import { execSync } from 'child_process';
+import semver from 'semver';
 import parse from 'parse-git-config';
+import bump from 'standard-version/lib/lifecycles/bump';
 import simplegit from 'simple-git/promise';
-import { someSeries, forEachSeries } from 'p-iteration';
+import { forEachSeries } from 'p-iteration';
+import { green, red, redBright, yellow } from 'chalk';
 import matcher from 'matcher';
 const { Plugin } = require('release-it');
 // const versionTransformer = (context) => (input) =>
@@ -19,100 +22,79 @@ type iConfig = {
   npm?: { tag: string | string[] };
 };
 
-const createChoice = async (config: iConfig, configName: string) => {
-  if (config.release !== true && typeof config.prerelease !== 'string') {
-    throw new Error('The release policy of the branch is incorrect.');
-  }
-
-  const args: any = {};
-  args.silent = true;
-  args.dryRun = true;
-  args.skip = {};
-  args.skip.changelog = true;
-
-  if (config.prerelease) {
-    let prerelease = config.prerelease;
-    if (config.prerelease.includes('%r')) {
-      const r = currentBranch.substr(configName.split('*')[0].length);
-      prerelease = prerelease.replace(/%r/g, r);
-    }
-    if (config.prerelease.includes('%h')) {
-      const h = execSync('git log --format="%H" -n 1')
-        .toString()
-        .substr(0, 7);
-      prerelease = prerelease.replace(/%h/g, h);
-    }
-    args.prerelease = prerelease;
-  }
-  // args.tagPrefix = 'v';
-  // args.releaseAs = '2.0.0';
-  // args.firstRelease = true;
-  let newVersion = await bump(args, currVersion);
-  if (args.prerelease && config.prerelease!.includes('%h')) {
-    const i = newVersion.lastIndexOf('.');
-    newVersion = newVersion.substr(0, i);
-  }
-  return {
-    title: `${
-      config.release ? chalk.red('release') : chalk.yellow('prerelease')
-    } (${newVersion})`,
-    value: newVersion
-  };
-};
+const versionTransformer = (context) => (input) =>
+  semver.valid(input)
+    ? semver.gt(input, context.latestVersion)
+      ? green(input)
+      : red(input)
+    : redBright(input);
 
 const getReleaseChoices = async (context) => {
+  let matchPolicies: iConfig[] | iConfig = context.matchPolicies;
   const {
     matchPrefix,
-    matchPolicies
+    gitCurrentBranch
   }: {
     matchPrefix: string;
-    matchPolicies: iConfig[] | iConfig;
-  } = context.matchPolicies;
-  // gfPrefix;
-  // currentBranch;
+    gitCurrentBranch: string;
+  } = context;
+  const latestVersion = context.latestVersion;
 
-  const choices = [];
-  if (Array.isArray(matchPolicies)) {
-    await forEachSeries(matchPolicies, async (value) => {
-      choices.push(await createChoice(value, matchPrefix));
+  const choices: { name: string; value: any }[] = [];
+
+  if (!Array.isArray(matchPolicies)) matchPolicies = [matchPolicies];
+
+  await forEachSeries(matchPolicies, async (policy) => {
+    if (policy.release !== true && typeof policy.prerelease !== 'string') {
+      throw new Error('The release policy of the branch is incorrect.');
+    }
+
+    const args: any = {};
+    args.silent = true;
+    args.dryRun = true;
+    args.skip = {};
+    args.skip.changelog = true;
+
+    if (policy.prerelease) {
+      let prerelease = policy.prerelease;
+      if (policy.prerelease.includes('%r')) {
+        const r = gitCurrentBranch.substr(matchPrefix.split('*')[0].length);
+        prerelease = prerelease.replace(/%r/g, r);
+      }
+      if (policy.prerelease.includes('%h')) {
+        const h = execSync('git log --format="%H" -n 1')
+          .toString()
+          .substr(0, 7);
+        prerelease = prerelease.replace(/%h/g, h);
+      }
+      args.prerelease = prerelease;
+    }
+    // args.tagPrefix = 'v';
+    // args.releaseAs = '2.0.0';
+    // args.firstRelease = true;
+    let newVersion = await bump(args, latestVersion);
+    if (args.prerelease && policy.prerelease!.includes('%h')) {
+      const i = newVersion.lastIndexOf('.');
+      newVersion = newVersion.substr(0, i);
+    }
+
+    choices.push({
+      name: `${
+        policy.release ? red('release') : yellow('prerelease')
+      } (${newVersion})`,
+      value: newVersion
     });
-  } else {
-    choices.push(await createChoice(matchPolicies, matchPrefix));
-  }
-  choices.push({ name: 'Other', value: null });
-  return choices;
-};
+  });
 
-// const getIncrementChoices = (context) => {
-//   console.log('[GitFlow Plugin] getIncrementChoices', context);
-//   // const types = context.latestIsPreRelease ? t.latestIsPreRelease : context.isPreRelease ? t.preRelease : t.default;
-//   // const choices = types.map(increment => ({
-//   //   name: `${increment} (${semver.inc(context.latestVersion, increment, context.preReleaseId)})`,
-//   //   value: increment
-//   // }));
-//   const otherChoice = {
-//     name: 'Other, please specify...',
-//     value: null
-//   };
-//   return [otherChoice];
-// };
+  const otherChoice = {
+    name: 'Other, please specify...',
+    value: null
+  };
 
-const prompts = {
-  releaseList: {
-    type: 'list',
-    message: () => 'Select or specify a new version:',
-    choices: (context) => getReleaseChoices(context),
-    pageSize: 9
-  }
+  return [...choices, otherChoice];
 };
 
 export default class GitFlow extends Plugin {
-  constructor(...args) {
-    console.log('[GitFlow Plugin] constructor', args);
-    super(...args);
-    this.registerPrompts(prompts);
-  }
-
   async init() {
     const GIT_CONFIG = await parse();
     const isGitFlowInit = Boolean(GIT_CONFIG['gitflow "branch"']);
@@ -126,8 +108,7 @@ export default class GitFlow extends Plugin {
     const gitStatus = await git.status();
     const gitCurrentBranch = gitStatus.current;
 
-    const context = this.getContext();
-    const gfrpConfig = context.gitflow;
+    const gfrpConfig = this.getContext();
 
     let matchPrefix: string | undefined;
     let matchPolicies:
@@ -151,21 +132,45 @@ export default class GitFlow extends Plugin {
     } else if (typeof matchPolicies === 'string') {
       throw new TypeError(`failed: ${matchPolicies}`);
     }
-    this.setContext({ matchPrefix, matchPolicies });
+    this.setContext({
+      gitCurrentBranch,
+      matchPrefix,
+      matchPolicies,
+      latestVersion: options.latestVersion
+    });
+
+    this.registerPrompts(await this.createPrompts());
     return this.promptReleaseVersion();
   }
 
-  getBranchName() {
-    return this.exec('git rev-parse --abbrev-ref HEAD', { options }).catch(
-      () => null
-    );
+  async createPrompts() {
+    const choices = await getReleaseChoices(this.getContext());
+    return {
+      releaseList: {
+        type: 'list',
+        message: () => 'Specify a new version:',
+        choices: () => choices,
+        pageSize: 9
+      },
+      version: {
+        type: 'input',
+        message: () => `Please enter a valid version:`,
+        transformer: (context) => versionTransformer(context),
+        validate: (input) =>
+          !!semver.valid(input) ||
+          'The version must follow the semver standard.'
+      }
+    };
   }
 
   promptReleaseVersion() {
     return new Promise((resolve) => {
       this.step({
         prompt: 'releaseList',
-        task: resolve
+        task: (increment) =>
+          increment
+            ? resolve(increment)
+            : this.step({ prompt: 'version', task: resolve })
       });
     });
   }

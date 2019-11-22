@@ -258,7 +258,7 @@ dotenv.config();
   }
 
   questions.push(PROMPT_COMMIT, PROMPT_PUSH);
-  const response = await prompts(questions);
+  // const response = await prompts(questions);
 
   // execSync(
   //   `npx release-it --increment ${response.version} --github.release --npm.tag=rc --preRelease --no-git.requireCleanWorkingDir`,
@@ -267,8 +267,11 @@ dotenv.config();
   //   }
   // );
 
-  // Version.prototype.incrementVersion = () => {
-  //   return response.version;
+  // const oo: () => any = Version.prototype.incrementVersion;
+  // Version.prototype.incrementVersion = function(options) {
+  //   // this.setContext({ preReleaseId: 'beta' });
+  //   this.global.preReleaseId = 'beta';
+  //   return oo.call(this, options);
   // };
 
   // Git.prototype.release = async function() {
@@ -321,7 +324,6 @@ dotenv.config();
     // preReleaseId: 'rc',
     dryRun: false,
     verbose: 0,
-    commit: false,
     git: { requireCleanWorkingDir: false, commit: false },
     plugins: {
       [path.resolve('./bin/gitflow')]: {
@@ -341,21 +343,19 @@ dotenv.config();
           { prerelease: 'beta' },
           { prerelease: 'rc' }
         ]
+      },
+      '@release-it/conventional-changelog': {
+        preset: 'angular',
+        infile: 'CHANGELOG.md'
       }
     }
-    // plugins: {
-    //   '@release-it/conventional-changelog': {
-    //     preset: 'angular',
-    //     infile: 'CHANGELOG.md'
-    //   }
-    // }
   });
 
   // execSync(`npx np --no-publish`, {
   //   stdio: 'inherit'
   // });
 
-  log('end.', response.version);
+  // log('end.', response.version);
 })().catch((error) => {
   console.log(chalk.red(error.message));
   console.log(error.stack);
