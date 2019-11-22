@@ -6212,8 +6212,7 @@ main$2.config();
     dryRun: false,
     verbose: 0,
     git: {
-      requireCleanWorkingDir: false,
-      commit: false
+      requireCleanWorkingDir: false
     },
     plugins: {
       [path.resolve('./bin/gitflow')]: {

@@ -1,3 +1,9 @@
+## [1.2.4-7c8f6f5](https://github.com/Youmenomi/gfrp/compare/0.4.14...1.2.4-7c8f6f5) (2019-11-22)
+
+## [1.2.4-7c8f6f5](https://github.com/Youmenomi/gfrp/compare/0.4.14...1.2.4-7c8f6f5) (2019-11-22)
+
+# [1.3.0](https://github.com/Youmenomi/gfrp/compare/0.4.14...1.3.0) (2019-11-22)
+
 ## [1.2.4-12abbb6](https://github.com/Youmenomi/gfrp/compare/0.4.14...1.2.4-12abbb6) (2019-11-22)
 
 ## [1.2.4-12abbb6](https://github.com/Youmenomi/gfrp/compare/0.4.14...1.2.4-12abbb6) (2019-11-22)

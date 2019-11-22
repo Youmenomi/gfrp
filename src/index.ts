@@ -324,7 +324,7 @@ dotenv.config();
     // preReleaseId: 'rc',
     dryRun: false,
     verbose: 0,
-    git: { requireCleanWorkingDir: false, commit: false },
+    git: { requireCleanWorkingDir: false },
     plugins: {
       [path.resolve('./bin/gitflow')]: {
         master: 'You should not release directly on the master branch.',
