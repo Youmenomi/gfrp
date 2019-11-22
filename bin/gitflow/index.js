@@ -2056,7 +2056,9 @@ var parseGitConfig = parse;
 
 const {
   Plugin
-} = require('release-it'); // const versionTransformer = (context) => (input) =>
+} = require('release-it');
+
+const npm = require('release-it/lib/plugin/npm/npm'); // const versionTransformer = (context) => (input) =>
 //   semver.valid(input)
 //     ? semver.gt(input, context.latestVersion)
 //       ? green(input)
@@ -2169,6 +2171,85 @@ class GitFlow extends Plugin {
     });
     this.registerPrompts((await this.createPrompts()));
     return this.promptReleaseVersion();
+  }
+
+  bump(version) {
+    console.log('bump----------------', version); // npm.prototype.bump = async function(version) {
+    //   const task = () =>
+    //     this.exec(`npm version ${version} --no-git-tag-version`).catch(
+    //       (err) => {
+    //         if (/version not changed/i.test(err)) {
+    //           this.log.warn(
+    //             `Did not update version in package.json, etc. (already at ${version}).`
+    //           );
+    //         }
+    //       }
+    //     );
+    //   // const tag = this.options.tag || (await this.resolveTag(version));
+    //   const choices: any[] = [];
+    //   // ${this.getName()}
+    //   try {
+    //     this.exec(`npm view react dist-tags`, {
+    //       write: false
+    //     });
+    //     Object.keys(
+    //       JSON.parse(
+    //         await this.exec(`npm view react dist-tags -json`, {
+    //           write: false
+    //         })
+    //       )
+    //     ).forEach((value) => {
+    //       choices.push({ name: value, value });
+    //     });
+    //   } catch (error) {}
+    //   const prompts = {
+    //     tagList: {
+    //       type: 'list',
+    //       message: () => 'Select a npm-dist-tag:',
+    //       choices: () => [
+    //         ...choices,
+    //         {
+    //           name: 'Other, please specify...',
+    //           value: null
+    //         }
+    //       ],
+    //       pageSize: 9
+    //     },
+    //     tag: {
+    //       type: 'input',
+    //       message: () => `Please enter a valid version:`,
+    //       transformer: (context) => (input) =>
+    //         semver.valid(input) ? redBright(input) : green(input),
+    //       validate: (input) =>
+    //         !semver.valid(input) ||
+    //         'The version must follow the semver standard.'
+    //     }
+    //   };
+    //   this.registerPrompts(prompts);
+    //   let tag;
+    //   await this.step({
+    //     prompt: 'tagList',
+    //     task: (r) => {
+    //       tag = r;
+    //     }
+    //   });
+    //   console.log('tag;;;;;;', tag);
+    //   // this.step({
+    //   //   prompt: 'tagList',
+    //   //   task: (increment) =>
+    //   //     increment
+    //   //       ? resolve(increment)
+    //   //       : this.step({ prompt: 'tag', task: resolve })
+    //   // });
+    //   this.setContext({ version, tag });
+    //   return this.spinner.show({ task, label: 'npm version' });
+    // };
+  }
+
+  getTags() {
+    return this.exec(`npm view gfrp dist-tags`, {
+      write: false
+    }).catch(() => null);
   }
 
   async createPrompts() {

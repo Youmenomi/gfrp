@@ -6181,8 +6181,8 @@ main$2.config();
   //     prompt: 'push'
   //   });
   // };
-
-  console.log(child_process.execSync(`npm view react dist-tags --json`).toString()); // npm.prototype.getRegistryPreReleaseTags = function() {
+  // console.log(execSync(`npm view gfrp dist-tags --json`).toString());
+  // npm.prototype.getRegistryPreReleaseTags = function() {
   //   return this.exec(`npm view ${this.getName()} dist-tags --json`, {
   //     options
   //   }).then(
@@ -6205,7 +6205,7 @@ main$2.config();
       release: true
     },
     npm: {
-      tag: 'rc'
+      tag: 'v1.4'
     },
     // preRelease: true,
     // preReleaseId: 'rc',

@@ -297,7 +297,7 @@ dotenv.config();
   //   });
   // };
 
-  console.log(execSync(`npm view react dist-tags --json`).toString());
+  // console.log(execSync(`npm view gfrp dist-tags --json`).toString());
 
   // npm.prototype.getRegistryPreReleaseTags = function() {
   //   return this.exec(`npm view ${this.getName()} dist-tags --json`, {
@@ -319,7 +319,7 @@ dotenv.config();
   await runTasks({
     // increment: response.version,
     github: { release: true },
-    npm: { tag: 'rc' },
+    npm: { tag: 'v1.4' },
     // preRelease: true,
     // preReleaseId: 'rc',
     dryRun: false,
