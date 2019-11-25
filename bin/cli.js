@@ -6204,9 +6204,7 @@ main$2.config();
     github: {
       release: true
     },
-    npm: {
-      tag: 'v1.4'
-    },
+    // npm: { tag: 'v1.4' },
     // preRelease: true,
     // preReleaseId: 'rc',
     dryRun: false,

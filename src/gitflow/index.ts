@@ -112,9 +112,7 @@ export default class GitFlow extends Plugin {
     const gfrpConfig = this.getContext();
 
     let matchPrefix: string | undefined;
-    let matchPolicies:
-      | { [key: string]: string | iConfig | iConfig[] }
-      | undefined;
+    let matchPolicies: string | iConfig | iConfig[] | undefined;
     Object.keys(gfrpConfig).some((prefix) => {
       const r = matcher.isMatch(gitCurrentBranch, prefix);
       if (r) {
@@ -130,7 +128,12 @@ export default class GitFlow extends Plugin {
     ) {
       this.log.warn('No corresponding release policy found.');
       return null;
-    } else if (typeof matchPolicies === 'string') {
+    } else if (
+      Array.isArray(matchPolicies) ||
+      typeof matchPolicies === 'object'
+    ) {
+      matchPolicies = ([] as any).concat(matchPolicies);
+    } else {
       throw new TypeError(`failed: ${matchPolicies}`);
     }
     this.setContext({
@@ -144,88 +147,8 @@ export default class GitFlow extends Plugin {
     return this.promptReleaseVersion();
   }
 
-  release() {
-    npm.prototype.release = async function(version) {
-      if (this.options.publish === false) return;
-
-      const publish = () => this.publish({ otpCallback });
-      const otpCallback = this.global.isCI
-        ? null
-        : (task) => this.step({ prompt: 'otp', task });
-      await this.step({
-        task: publish,
-        label: 'npm publish',
-        prompt: 'publish'
-      });
-
-      const choices: any[] = [];
-
-      // ${this.getName()}
-      try {
-        this.exec(`npm view react dist-tags`, {
-          write: false
-        });
-        Object.keys(
-          JSON.parse(
-            await this.exec(`npm view react dist-tags -json`, {
-              write: false
-            })
-          )
-        ).forEach((value) => {
-          choices.push({ name: value, value });
-        });
-      } catch (error) {}
-
-      const prompts = {
-        tagList: {
-          type: 'list',
-          message: () => 'Select a npm-dist-tag:',
-          choices: () => [
-            ...choices,
-            {
-              name: 'Other, please specify...',
-              value: null
-            }
-          ],
-          pageSize: 9
-        },
-        tag: {
-          type: 'input',
-          message: () => `Please enter a valid version:`,
-          transformer: (context) => (input) =>
-            semver.valid(input) ? redBright(input) : green(input),
-          validate: (input) =>
-            !semver.valid(input) ||
-            'The version must follow the semver standard.'
-        }
-      };
-      this.registerPrompts(prompts);
-
-      let tag;
-      await this.step({
-        prompt: 'tagList',
-        task: (r) => {
-          tag = r;
-        }
-      });
-      console.log('tag;;;;;;', tag);
-      // this.step({
-      //   prompt: 'tagList',
-      //   task: (increment) =>
-      //     increment
-      //       ? resolve(increment)
-      //       : this.step({ prompt: 'tag', task: resolve })
-      // });
-
-      this.setContext({ version, tag });
-      return this.spinner.show({ task, label: 'npm version' });
-    };
-  }
-
   bump(version) {
-    console.log('bump----------------', version);
-
-    // npm.prototype.bump = async function(version) {
+    // npm.prototype.bump = function() {
     //   const task = () =>
     //     this.exec(`npm version ${version} --no-git-tag-version`).catch(
     //       (err) => {
@@ -236,76 +159,118 @@ export default class GitFlow extends Plugin {
     //         }
     //       }
     //     );
-    //   // const tag = this.options.tag || (await this.resolveTag(version));
-
-    //   const choices: any[] = [];
-
-    //   // ${this.getName()}
-    //   try {
-    //     this.exec(`npm view react dist-tags`, {
-    //       write: false
-    //     });
-    //     Object.keys(
-    //       JSON.parse(
-    //         await this.exec(`npm view react dist-tags -json`, {
-    //           write: false
-    //         })
-    //       )
-    //     ).forEach((value) => {
-    //       choices.push({ name: value, value });
-    //     });
-    //   } catch (error) {}
-
-    //   const prompts = {
-    //     tagList: {
-    //       type: 'list',
-    //       message: () => 'Select a npm-dist-tag:',
-    //       choices: () => [
-    //         ...choices,
-    //         {
-    //           name: 'Other, please specify...',
-    //           value: null
-    //         }
-    //       ],
-    //       pageSize: 9
-    //     },
-    //     tag: {
-    //       type: 'input',
-    //       message: () => `Please enter a valid version:`,
-    //       transformer: (context) => (input) =>
-    //         semver.valid(input) ? redBright(input) : green(input),
-    //       validate: (input) =>
-    //         !semver.valid(input) ||
-    //         'The version must follow the semver standard.'
-    //     }
-    //   };
-    //   this.registerPrompts(prompts);
-
-    //   let tag;
-    //   await this.step({
-    //     prompt: 'tagList',
-    //     task: (r) => {
-    //       tag = r;
-    //     }
-    //   });
-    //   console.log('tag;;;;;;', tag);
-    //   // this.step({
-    //   //   prompt: 'tagList',
-    //   //   task: (increment) =>
-    //   //     increment
-    //   //       ? resolve(increment)
-    //   //       : this.step({ prompt: 'tag', task: resolve })
-    //   // });
-
-    //   this.setContext({ version, tag });
     //   return this.spinner.show({ task, label: 'npm version' });
     // };
-  }
 
-  getTags() {
-    return this.exec(`npm view gfrp dist-tags`, {
-      write: false
-    }).catch(() => null);
+    npm.prototype.release = async function() {
+      if (this.options.publish === false) return;
+
+      this.registerPrompts({
+        publish: {
+          type: 'confirm',
+          message: () => 'Publish to npm?',
+          default: true
+        }
+      });
+
+      let isPublish = false;
+      await this.step({
+        task: () => {
+          isPublish = true;
+        },
+        prompt: 'publish'
+      });
+
+      if (!isPublish) return;
+
+      let tag;
+      if (this.options.tag) {
+        tag = this.options.tag;
+      } else if (this.global.isCI) {
+        tag =
+          this.getContext().matchPolicies[0] ||
+          (await this.resolveTag(version));
+      } else {
+        const choices: any[] = [];
+
+        if (this.getContext().isNewPackage) {
+          const DEFAULT_TAG = 'latest';
+          const DEFAULT_TAG_PRERELEASE = 'next';
+          choices.push(
+            { name: DEFAULT_TAG, value: DEFAULT_TAG },
+            {
+              name: DEFAULT_TAG_PRERELEASE,
+              value: DEFAULT_TAG_PRERELEASE
+            }
+          );
+        } else {
+          this.exec(`npm view ${this.getName()} dist-tags`, {
+            write: false
+          });
+          Object.keys(
+            JSON.parse(
+              await this.exec(`npm view ${this.getName()} dist-tags -json`, {
+                write: false
+              })
+            )
+          ).forEach((value) => {
+            choices.push({ name: value, value });
+          });
+        }
+
+        const prompts = {
+          tagList: {
+            type: 'list',
+            message: () => 'Select a npm-dist-tag:',
+            choices: () => [
+              ...choices,
+              {
+                name: 'Other, please specify...',
+                value: null
+              }
+            ],
+            pageSize: 9
+          },
+          tag: {
+            type: 'input',
+            message: () => `Please enter a valid tag:`,
+            transformer: (context) => (input) => {
+              return semver.validRange(input) ? redBright(input) : green(input);
+            },
+            validate: (input) =>
+              semver.validRange(input)
+                ? 'Tags that can be interpreted as valid semver ranges will be rejected.'
+                : true
+          }
+        };
+        this.registerPrompts(prompts);
+
+        await this.step({
+          prompt: 'tagList',
+          task: (r) => {
+            tag = r;
+          }
+        });
+
+        if (!tag) {
+          await this.step({
+            prompt: 'tag',
+            task: (r) => {
+              tag = r;
+            }
+          });
+        }
+      }
+      this.setContext({ version, tag });
+
+      const publish = () => this.publish({ otpCallback });
+
+      const otpCallback = this.global.isCI
+        ? null
+        : (task) => this.step({ prompt: 'otp', task });
+
+      await this.spinner.show({ task: publish, label: 'npm publish' });
+    };
   }
 
   async createPrompts() {

@@ -319,7 +319,7 @@ dotenv.config();
   await runTasks({
     // increment: response.version,
     github: { release: true },
-    npm: { tag: 'v1.4' },
+    // npm: { tag: 'v1.4' },
     // preRelease: true,
     // preReleaseId: 'rc',
     dryRun: false,
