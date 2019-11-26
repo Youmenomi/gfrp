@@ -1,4 +1,3 @@
-// import { Plugin } from 'release-it';
 import { execSync } from 'child_process';
 import semver from 'semver';
 import parse from 'parse-git-config';
@@ -11,37 +10,24 @@ const { Plugin } = require('release-it');
 const npm = require('release-it/lib/plugin/npm/npm');
 const Git = require('release-it/lib/plugin/git/Git');
 const GitHub = require('release-it/lib/plugin/github/GitHub');
-// const versionTransformer = (context) => (input) =>
-//   semver.valid(input)
-//     ? semver.gt(input, context.latestVersion)
-//       ? green(input)
-//       : red(input)
-//     : redBright(input);
 
 const _ = require('lodash');
 const isCI = require('is-ci');
-// const Config = require('release-it/lib/config');
-// Config.prototype.mergeOptions = function() {
-//   console.log('mergeOptions1111111');
-//   this.defaultConfig.github.draft = false;
-//   return _.defaultsDeep(
-//     {},
-//     this.constructorConfig,
-//     {
-//       ci: isCI || undefined
-//     },
-//     this.localConfig,
-//     this.defaultConfig
-//   );
-// };
-// console.log('mergeOptions000000', Config.prototype.options);
 
-type iConfig = {
-  release?: boolean;
-  prerelease?: string;
-  options?: any;
-  npm?: { tag: string | string[] };
+type iOpts = {
+  finArgs?: string;
+  npmTags?: string[];
 };
+type iPrereleaseWithiOpts = {
+  name: string;
+} & iOpts;
+type iConfig = {
+  release?: boolean | iOpts;
+  prerelease?:
+    | string
+    | iPrereleaseWithiOpts
+    | (string | iPrereleaseWithiOpts)[];
+} & iOpts;
 
 const versionTransformer = (context) => (input) =>
   semver.valid(input)
@@ -50,8 +36,49 @@ const versionTransformer = (context) => (input) =>
       : red(input)
     : redBright(input);
 
-const getReleaseChoices = async (context) => {
-  let matchPolicies: iConfig[] | iConfig = context.matchPolicies;
+const getNewVersion = async (
+  gitCurrentBranch: string,
+  matchPrefix: string,
+  latestVersion: string,
+  prerelease?: string
+) => {
+  const args: any = {};
+  args.silent = true;
+  args.dryRun = true;
+  args.skip = {};
+  args.skip.changelog = true;
+
+  if (prerelease) {
+    if (prerelease.includes('%r')) {
+      const r = gitCurrentBranch.substr(matchPrefix.split('*')[0].length);
+      prerelease = prerelease.replace(/%r/g, r);
+    }
+    if (prerelease.includes('%h')) {
+      const h = execSync('git log --format="%H" -n 1')
+        .toString()
+        .substr(0, 7);
+      prerelease = prerelease.replace(/%h/g, h);
+    }
+    args.prerelease = prerelease;
+  }
+  // args.tagPrefix = 'v';
+  // args.releaseAs = '2.0.0';
+  // args.firstRelease = true;
+  let newVersion = await bump(args, latestVersion);
+  if (args.prerelease && prerelease!.includes('%h')) {
+    const i = newVersion.lastIndexOf('.');
+    newVersion = newVersion.substr(0, i);
+  }
+
+  return newVersion;
+};
+
+const createChoice = async (
+  context,
+  policy: boolean | iOpts | string | iPrereleaseWithiOpts,
+  prerelease?: string
+) => {
+  const matchPolicies: iConfig = context.matchPolicies;
   const {
     matchPrefix,
     gitCurrentBranch
@@ -61,51 +88,44 @@ const getReleaseChoices = async (context) => {
   } = context;
   const latestVersion = context.latestVersion;
 
+  const { finArgs, npmTags } = policy as iOpts;
+  const newVersion = await getNewVersion(
+    gitCurrentBranch,
+    matchPrefix,
+    latestVersion,
+    prerelease
+  );
+  return {
+    name: newVersion,
+    value: _.defaults(
+      { newVersion, finArgs, npmTags },
+      { finArgs: matchPolicies.finArgs, npmTags: matchPolicies.npmTags }
+    )
+  };
+};
+const getReleaseChoices = async (context) => {
+  const matchPolicies: iConfig = context.matchPolicies;
   const choices: { name: string; value: any }[] = [];
 
-  if (!Array.isArray(matchPolicies)) matchPolicies = [matchPolicies];
+  if (matchPolicies.release) {
+    choices.push(await createChoice(context, matchPolicies.release));
+  }
 
-  await forEachSeries(matchPolicies, async (policy) => {
-    if (policy.release !== true && typeof policy.prerelease !== 'string') {
-      throw new Error('The release policy of the branch is incorrect.');
-    }
+  if (matchPolicies.prerelease) {
+    const policies = Array.isArray(matchPolicies.prerelease)
+      ? matchPolicies.prerelease
+      : [matchPolicies.prerelease];
 
-    const args: any = {};
-    args.silent = true;
-    args.dryRun = true;
-    args.skip = {};
-    args.skip.changelog = true;
-
-    if (policy.prerelease) {
-      let prerelease = policy.prerelease;
-      if (policy.prerelease.includes('%r')) {
-        const r = gitCurrentBranch.substr(matchPrefix.split('*')[0].length);
-        prerelease = prerelease.replace(/%r/g, r);
-      }
-      if (policy.prerelease.includes('%h')) {
-        const h = execSync('git log --format="%H" -n 1')
-          .toString()
-          .substr(0, 7);
-        prerelease = prerelease.replace(/%h/g, h);
-      }
-      args.prerelease = prerelease;
-    }
-    // args.tagPrefix = 'v';
-    // args.releaseAs = '2.0.0';
-    // args.firstRelease = true;
-    let newVersion = await bump(args, latestVersion);
-    if (args.prerelease && policy.prerelease!.includes('%h')) {
-      const i = newVersion.lastIndexOf('.');
-      newVersion = newVersion.substr(0, i);
-    }
-
-    choices.push({
-      name: `${
-        policy.release ? red('release') : yellow('prerelease')
-      } (${newVersion})`,
-      value: newVersion
+    await forEachSeries(policies, async (policy) => {
+      choices.push(
+        await createChoice(
+          context,
+          policy,
+          typeof policy === 'string' ? policy : policy.name
+        )
+      );
     });
-  });
+  }
 
   const otherChoice = {
     name: 'Other, please specify...',
@@ -125,6 +145,14 @@ export default class GitFlow extends Plugin {
     super({ namespace, options, global, container });
 
     this.config.defaultConfig.github.draft = true;
+    const overwriteDefaultConfig = {
+      git: {
+        requireUpstream: false
+      },
+      github: {
+        draft: true
+      }
+    };
     this.config.options = _.defaultsDeep(
       {},
       this.config.constructorConfig,
@@ -132,8 +160,11 @@ export default class GitFlow extends Plugin {
         ci: isCI || undefined
       },
       this.config.localConfig,
+      overwriteDefaultConfig,
       this.config.defaultConfig
     );
+
+    this.hackGit();
 
     const superInit = GitHub.prototype.init;
     GitHub.prototype.init = async function() {
@@ -141,6 +172,16 @@ export default class GitFlow extends Plugin {
       this.options = Object.freeze(
         this.getInitialOptions(this.config.getContext(), 'github')
       );
+    };
+  }
+
+  hackGit() {
+    const superInit = Git.prototype.init;
+    Git.prototype.init = async function() {
+      this.options = Object.freeze(
+        this.getInitialOptions(this.config.getContext(), 'git')
+      );
+      await superInit.call(this);
     };
   }
 
@@ -161,7 +202,7 @@ export default class GitFlow extends Plugin {
     const gfrpConfig = this.getContext();
 
     let matchPrefix: string | undefined;
-    let matchPolicies: string | iConfig | iConfig[] | undefined;
+    let matchPolicies: string | iConfig | undefined;
     Object.keys(gfrpConfig).some((prefix) => {
       const r = matcher.isMatch(gitCurrentBranch, prefix);
       if (r) {
@@ -171,20 +212,13 @@ export default class GitFlow extends Plugin {
       return r;
     });
 
-    if (
-      !matchPolicies ||
-      (Array.isArray(matchPolicies) && matchPolicies.length === 0)
-    ) {
+    if (!matchPolicies) {
       this.log.warn('No corresponding release policy found.');
       return null;
-    } else if (
-      Array.isArray(matchPolicies) ||
-      typeof matchPolicies === 'object'
-    ) {
-      matchPolicies = ([] as any).concat(matchPolicies);
-    } else {
+    } else if (typeof matchPolicies === 'string') {
       throw new TypeError(`failed: ${matchPolicies}`);
     }
+
     this.setContext({
       gitCurrentBranch,
       matchPrefix,
@@ -193,7 +227,11 @@ export default class GitFlow extends Plugin {
     });
 
     this.registerPrompts(await this.createPrompts());
-    return this.promptReleaseVersion();
+    const policy = await this.promptReleaseVersion();
+
+    this.setContext({ policy });
+    console.log('policy:', policy);
+    return policy.newVersion;
   }
 
   bump(version) {
@@ -217,20 +255,83 @@ export default class GitFlow extends Plugin {
     //   matchPolicies,
     //   latestVersion: options.latestVersion
     // });
-    const { gitCurrentBranch } = this.getContext();
+    const { gitCurrentBranch, matchPrefix, matchPolicies } = this.getContext();
 
-    const {
-      tagDependsOnCommit = true
-      // releaseDependsOnPush = true
-    } = this.options;
+    // const {
+    //   tagDependsOnCommit = true
+    // releaseDependsOnPush = true
+    // } = this.options;
     Git.prototype.release = async function() {
-      switch (gitCurrentBranch) {
+      switch (gitCurrentBranch.split('/')[0]) {
+        case 'feature':
+          this.commit();
+
+          const prompts = {
+            finArgs: {
+              type: 'checkbox',
+              message: () => 'Select a npm-dist-tag:',
+              choices: () => [
+                {
+                  name: '-r rebase instead of merge',
+                  value: 'r'
+                },
+                {
+                  name: '-F fetch from $ORIGIN before performing finish',
+                  value: 'F'
+                },
+                {
+                  name: '-k keep branch after performing finish',
+                  value: 'k'
+                },
+                {
+                  name: '-D force delete feature branch after finish',
+                  value: 'D'
+                },
+                {
+                  name: 'S squash feature during merge',
+                  value: 'S'
+                }
+              ],
+              default: [],
+              pageSize: 9
+            },
+            finishOptions: {
+              type: 'input',
+              message: () => `Please enter a valid tag:`,
+              transformer: (context) => (input) => {
+                return semver.validRange(input)
+                  ? redBright(input)
+                  : green(input);
+              },
+              validate: (input) =>
+                semver.validRange(input)
+                  ? 'Tag name must not be a valid SemVer range.'
+                  : true
+            }
+          };
+          this.registerPrompts(prompts);
+          await this.step({
+            task: () => {
+              isCommit = true;
+              this.commit();
+            },
+            label: 'Finish feature',
+            prompt: 'finishfeature'
+          });
+
+          execSync(`git flow feature finish`, {
+            stdio: 'inherit'
+          });
+          break;
         case 'release':
           execSync(`git flow release finish`, {
             stdio: 'inherit'
           });
           break;
         case 'hotfix':
+          execSync(`git flow release finish`, {
+            stdio: 'inherit'
+          });
           break;
         default:
           this.commit();
@@ -395,16 +496,21 @@ export default class GitFlow extends Plugin {
     };
   }
 
-  promptReleaseVersion() {
-    return new Promise((resolve) => {
-      this.step({
-        prompt: 'releaseList',
-        task: (increment) =>
-          increment
-            ? resolve(increment)
-            : this.step({ prompt: 'version', task: resolve })
-      });
+  async promptReleaseVersion() {
+    let policy;
+    await this.step({
+      prompt: 'releaseList',
+      task: (r) => (policy = r)
     });
+    if (policy) return policy.newVersion;
+
+    await this.step({
+      prompt: 'version',
+      task: (newVersion) => {
+        policy = { newVersion };
+      }
+    });
+    return policy;
   }
 
   promptGitFlowInit() {

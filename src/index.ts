@@ -328,11 +328,14 @@ dotenv.config();
     plugins: {
       [path.resolve('./bin/gitflow')]: {
         master: 'You should not release directly on the master branch.',
-        develop: [
-          { prerelease: 'alpha', npm: { tag: ['alpha', 'next'] } },
-          { prerelease: '%h' }
-        ],
-        'feature/*': [{ prerelease: 'alpha' }, { prerelease: '%r' }],
+        develop: {
+          prerelease: [{ name: 'alpha', npmTags: ['alpha', 'next'] }, '%h']
+        },
+        'feature/*': {
+          prerelease: ['alpha', '%r'],
+          finArgs: 'rFkDS',
+          npmTags: ['alpha', 'next']
+        },
         'release/*': [
           { release: true },
           { prerelease: 'beta' },

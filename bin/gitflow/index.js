@@ -2052,8 +2052,6 @@ function injectInclude(input, cwd) {
 
 var parseGitConfig = parse;
 
-// import { Plugin } from 'release-it';
-
 const {
   Plugin
 } = require('release-it');
@@ -2062,86 +2060,88 @@ const npm = require('release-it/lib/plugin/npm/npm');
 
 const Git = require('release-it/lib/plugin/git/Git');
 
-const GitHub = require('release-it/lib/plugin/github/GitHub'); // const versionTransformer = (context) => (input) =>
-//   semver.valid(input)
-//     ? semver.gt(input, context.latestVersion)
-//       ? green(input)
-//       : red(input)
-//     : redBright(input);
-
+const GitHub = require('release-it/lib/plugin/github/GitHub');
 
 const _ = require('lodash');
 
-const isCI = require('is-ci'); // const Config = require('release-it/lib/config');
-// Config.prototype.mergeOptions = function() {
-//   console.log('mergeOptions1111111');
-//   this.defaultConfig.github.draft = false;
-//   return _.defaultsDeep(
-//     {},
-//     this.constructorConfig,
-//     {
-//       ci: isCI || undefined
-//     },
-//     this.localConfig,
-//     this.defaultConfig
-//   );
-// };
-// console.log('mergeOptions000000', Config.prototype.options);
-
+const isCI = require('is-ci');
 
 const versionTransformer = context => input => semver.valid(input) ? semver.gt(input, context.latestVersion) ? chalk.green(input) : chalk.red(input) : chalk.redBright(input);
 
-const getReleaseChoices = async context => {
-  let matchPolicies = context.matchPolicies;
+const getNewVersion = async (gitCurrentBranch, matchPrefix, latestVersion, prerelease) => {
+  const args = {};
+  args.silent = true;
+  args.dryRun = true;
+  args.skip = {};
+  args.skip.changelog = true;
+
+  if (prerelease) {
+    if (prerelease.includes('%r')) {
+      const r = gitCurrentBranch.substr(matchPrefix.split('*')[0].length);
+      prerelease = prerelease.replace(/%r/g, r);
+    }
+
+    if (prerelease.includes('%h')) {
+      const h = child_process.execSync('git log --format="%H" -n 1').toString().substr(0, 7);
+      prerelease = prerelease.replace(/%h/g, h);
+    }
+
+    args.prerelease = prerelease;
+  } // args.tagPrefix = 'v';
+  // args.releaseAs = '2.0.0';
+  // args.firstRelease = true;
+
+
+  let newVersion = await bump(args, latestVersion);
+
+  if (args.prerelease && prerelease.includes('%h')) {
+    const i = newVersion.lastIndexOf('.');
+    newVersion = newVersion.substr(0, i);
+  }
+
+  return newVersion;
+};
+
+const createChoice = async (context, policy, prerelease) => {
+  const matchPolicies = context.matchPolicies;
   const {
     matchPrefix,
     gitCurrentBranch
   } = context;
   const latestVersion = context.latestVersion;
+  const {
+    finArgs,
+    npmTags
+  } = policy;
+  const newVersion = await getNewVersion(gitCurrentBranch, matchPrefix, latestVersion, prerelease);
+  return {
+    name: newVersion,
+    value: _.defaults({
+      newVersion,
+      finArgs,
+      npmTags
+    }, {
+      finArgs: matchPolicies.finArgs,
+      npmTags: matchPolicies.npmTags
+    })
+  };
+};
+
+const getReleaseChoices = async context => {
+  const matchPolicies = context.matchPolicies;
   const choices = [];
-  if (!Array.isArray(matchPolicies)) matchPolicies = [matchPolicies];
-  await pIteration.forEachSeries(matchPolicies, async policy => {
-    if (policy.release !== true && typeof policy.prerelease !== 'string') {
-      throw new Error('The release policy of the branch is incorrect.');
-    }
 
-    const args = {};
-    args.silent = true;
-    args.dryRun = true;
-    args.skip = {};
-    args.skip.changelog = true;
+  if (matchPolicies.release) {
+    choices.push((await createChoice(context, matchPolicies.release)));
+  }
 
-    if (policy.prerelease) {
-      let prerelease = policy.prerelease;
-
-      if (policy.prerelease.includes('%r')) {
-        const r = gitCurrentBranch.substr(matchPrefix.split('*')[0].length);
-        prerelease = prerelease.replace(/%r/g, r);
-      }
-
-      if (policy.prerelease.includes('%h')) {
-        const h = child_process.execSync('git log --format="%H" -n 1').toString().substr(0, 7);
-        prerelease = prerelease.replace(/%h/g, h);
-      }
-
-      args.prerelease = prerelease;
-    } // args.tagPrefix = 'v';
-    // args.releaseAs = '2.0.0';
-    // args.firstRelease = true;
-
-
-    let newVersion = await bump(args, latestVersion);
-
-    if (args.prerelease && policy.prerelease.includes('%h')) {
-      const i = newVersion.lastIndexOf('.');
-      newVersion = newVersion.substr(0, i);
-    }
-
-    choices.push({
-      name: `${policy.release ? chalk.red('release') : chalk.yellow('prerelease')} (${newVersion})`,
-      value: newVersion
+  if (matchPolicies.prerelease) {
+    const policies = Array.isArray(matchPolicies.prerelease) ? matchPolicies.prerelease : [matchPolicies.prerelease];
+    await pIteration.forEachSeries(policies, async policy => {
+      choices.push((await createChoice(context, policy, typeof policy === 'string' ? policy : policy.name)));
     });
-  });
+  }
+
   const otherChoice = {
     name: 'Other, please specify...',
     value: null
@@ -2163,14 +2163,32 @@ class GitFlow extends Plugin {
       container
     });
     this.config.defaultConfig.github.draft = true;
+    const overwriteDefaultConfig = {
+      git: {
+        requireUpstream: false
+      },
+      github: {
+        draft: true
+      }
+    };
     this.config.options = _.defaultsDeep({}, this.config.constructorConfig, {
       ci: isCI || undefined
-    }, this.config.localConfig, this.config.defaultConfig);
+    }, this.config.localConfig, overwriteDefaultConfig, this.config.defaultConfig);
+    this.hackGit();
     const superInit = GitHub.prototype.init;
 
     GitHub.prototype.init = async function () {
       await superInit.call(this);
       this.options = Object.freeze(this.getInitialOptions(this.config.getContext(), 'github'));
+    };
+  }
+
+  hackGit() {
+    const superInit = Git.prototype.init;
+
+    Git.prototype.init = async function () {
+      this.options = Object.freeze(this.getInitialOptions(this.config.getContext(), 'git'));
+      await superInit.call(this);
     };
   }
 
@@ -2203,12 +2221,10 @@ class GitFlow extends Plugin {
       return r;
     });
 
-    if (!matchPolicies || Array.isArray(matchPolicies) && matchPolicies.length === 0) {
+    if (!matchPolicies) {
       this.log.warn('No corresponding release policy found.');
       return null;
-    } else if (Array.isArray(matchPolicies) || typeof matchPolicies === 'object') {
-      matchPolicies = [].concat(matchPolicies);
-    } else {
+    } else if (typeof matchPolicies === 'string') {
       throw new TypeError(`failed: ${matchPolicies}`);
     }
 
@@ -2219,7 +2235,12 @@ class GitFlow extends Plugin {
       latestVersion: options.latestVersion
     });
     this.registerPrompts((await this.createPrompts()));
-    return this.promptReleaseVersion();
+    const policy = await this.promptReleaseVersion();
+    this.setContext({
+      policy
+    });
+    console.log('policy:', policy);
+    return policy.newVersion;
   }
 
   bump(version) {
@@ -2236,33 +2257,118 @@ class GitFlow extends Plugin {
     //     );
     //   return this.spinner.show({ task, label: 'npm version' });
     // };
-    // const { tagDependsOnCommit = true, releaseDependsOnPush = true} = this.options;
-    // Git.prototype.release = async function() {
-    //   const { commit, tag, push } = this.options;
-    //   let isCommit = false;
-    //   await this.step({
-    //     enabled: commit,
-    //     task: () => {
-    //       isCommit = true;
-    //       this.commit();
-    //     },
-    //     label: 'Git commit',
-    //     prompt: 'commit'
-    //   });
-    //   if(commitDependsOnTag && isCommit)
-    //   await this.step({
-    //     enabled: isCommit,
-    //     task: () => this.tag(),
-    //     label: 'Git tag',
-    //     prompt: 'tag'
-    //   });
-    //   await this.step({
-    //     enabled: push,
-    //     task: () => this.push(),
-    //     label: 'Git push',
-    //     prompt: 'push'
-    //   });
-    // };
+    // this.setContext({
+    //   gitCurrentBranch,
+    //   matchPrefix,
+    //   matchPolicies,
+    //   latestVersion: options.latestVersion
+    // });
+    const {
+      gitCurrentBranch,
+      matchPrefix,
+      matchPolicies
+    } = this.getContext(); // const {
+    //   tagDependsOnCommit = true
+    // releaseDependsOnPush = true
+    // } = this.options;
+
+    Git.prototype.release = async function () {
+      switch (gitCurrentBranch.split('/')[0]) {
+        case 'feature':
+          this.commit();
+          const prompts = {
+            finArgs: {
+              type: 'checkbox',
+              message: () => 'Select a npm-dist-tag:',
+              choices: () => [{
+                name: '-r rebase instead of merge',
+                value: 'r'
+              }, {
+                name: '-F fetch from $ORIGIN before performing finish',
+                value: 'F'
+              }, {
+                name: '-k keep branch after performing finish',
+                value: 'k'
+              }, {
+                name: '-D force delete feature branch after finish',
+                value: 'D'
+              }, {
+                name: 'S squash feature during merge',
+                value: 'S'
+              }],
+              default: [],
+              pageSize: 9
+            },
+            finishOptions: {
+              type: 'input',
+              message: () => `Please enter a valid tag:`,
+              transformer: context => input => {
+                return semver.validRange(input) ? chalk.redBright(input) : chalk.green(input);
+              },
+              validate: input => semver.validRange(input) ? 'Tag name must not be a valid SemVer range.' : true
+            }
+          };
+          this.registerPrompts(prompts);
+          await this.step({
+            task: () => {
+              isCommit = true;
+              this.commit();
+            },
+            label: 'Finish feature',
+            prompt: 'finishfeature'
+          });
+          child_process.execSync(`git flow feature finish`, {
+            stdio: 'inherit'
+          });
+          break;
+
+        case 'release':
+          child_process.execSync(`git flow release finish`, {
+            stdio: 'inherit'
+          });
+          break;
+
+        case 'hotfix':
+          child_process.execSync(`git flow release finish`, {
+            stdio: 'inherit'
+          });
+          break;
+
+        default:
+          this.commit();
+          this.tag();
+          break;
+      }
+
+      const {
+        commit,
+        tag,
+        push
+      } = this.options;
+      let isCommit = false;
+      await this.step({
+        enabled: commit,
+        task: () => {
+          isCommit = true;
+          this.commit();
+        },
+        label: 'Git commit',
+        prompt: 'commit'
+      });
+      if (tagDependsOnCommit && isCommit) await this.step({
+        enabled: isCommit,
+        task: () => this.tag(),
+        label: 'Git tag',
+        prompt: 'tag'
+      });
+      await this.step({
+        enabled: push,
+        task: () => this.push(),
+        label: 'Git push',
+        prompt: 'push'
+      });
+    };
+
     npm.prototype.release = async function () {
       if (this.options.publish === false) return;
       this.registerPrompts({
@@ -2388,16 +2494,22 @@ class GitFlow extends Plugin {
     };
   }
 
-  promptReleaseVersion() {
-    return new Promise(resolve => {
-      this.step({
-        prompt: 'releaseList',
-        task: increment => increment ? resolve(increment) : this.step({
-          prompt: 'version',
-          task: resolve
-        })
-      });
+  async promptReleaseVersion() {
+    let policy;
+    await this.step({
+      prompt: 'releaseList',
+      task: r => policy = r
     });
+    if (policy) return policy.newVersion;
+    await this.step({
+      prompt: 'version',
+      task: newVersion => {
+        policy = {
+          newVersion
+        };
+      }
+    });
+    return policy;
   }
 
   promptGitFlowInit() {
