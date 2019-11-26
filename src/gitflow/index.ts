@@ -502,7 +502,7 @@ export default class GitFlow extends Plugin {
       prompt: 'releaseList',
       task: (r) => (policy = r)
     });
-    if (policy) return policy.newVersion;
+    if (policy) return policy;
 
     await this.step({
       prompt: 'version',

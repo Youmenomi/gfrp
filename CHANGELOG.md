@@ -1,3 +1,15 @@
+# [1.4.0-alpha.0](https://github.com/Youmenomi/gfrp/compare/0.0.0-a123...1.4.0-alpha.0) (2019-11-26)
+
+
+### Bug Fixes
+
+* 456 ([eaf1633](https://github.com/Youmenomi/gfrp/commit/eaf16334a54e972161b74593927ad35ff6a38acb))
+
+
+### Features
+
+* 123 ([5c02d9b](https://github.com/Youmenomi/gfrp/commit/5c02d9b48a65659a1411846ff2e51a50ca159d2f))
+
 # [1.3.0](https://github.com/Youmenomi/gfrp/compare/0.0.0-a123...1.3.0) (2019-11-26)
 
 
