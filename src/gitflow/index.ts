@@ -1,5 +1,5 @@
 // import { Plugin } from 'release-it';
-import { execSync, exec } from 'child_process';
+import { execSync } from 'child_process';
 import semver from 'semver';
 import parse from 'parse-git-config';
 import bump from 'standard-version/lib/lifecycles/bump';
@@ -9,12 +9,32 @@ import { green, red, redBright, yellow } from 'chalk';
 import matcher from 'matcher';
 const { Plugin } = require('release-it');
 const npm = require('release-it/lib/plugin/npm/npm');
+const Git = require('release-it/lib/plugin/git/Git');
+const GitHub = require('release-it/lib/plugin/github/GitHub');
 // const versionTransformer = (context) => (input) =>
 //   semver.valid(input)
 //     ? semver.gt(input, context.latestVersion)
 //       ? green(input)
 //       : red(input)
 //     : redBright(input);
+
+const _ = require('lodash');
+const isCI = require('is-ci');
+// const Config = require('release-it/lib/config');
+// Config.prototype.mergeOptions = function() {
+//   console.log('mergeOptions1111111');
+//   this.defaultConfig.github.draft = false;
+//   return _.defaultsDeep(
+//     {},
+//     this.constructorConfig,
+//     {
+//       ci: isCI || undefined
+//     },
+//     this.localConfig,
+//     this.defaultConfig
+//   );
+// };
+// console.log('mergeOptions000000', Config.prototype.options);
 
 type iConfig = {
   release?: boolean;
@@ -96,6 +116,34 @@ const getReleaseChoices = async (context) => {
 };
 
 export default class GitFlow extends Plugin {
+  constructor({
+    namespace,
+    options = {},
+    global = {},
+    container = {}
+  }: any = {}) {
+    super({ namespace, options, global, container });
+
+    this.config.defaultConfig.github.draft = true;
+    this.config.options = _.defaultsDeep(
+      {},
+      this.config.constructorConfig,
+      {
+        ci: isCI || undefined
+      },
+      this.config.localConfig,
+      this.config.defaultConfig
+    );
+
+    const superInit = GitHub.prototype.init;
+    GitHub.prototype.init = async function() {
+      await superInit.call(this);
+      this.options = Object.freeze(
+        this.getInitialOptions(this.config.getContext(), 'github')
+      );
+    };
+  }
+
   async init() {
     const GIT_CONFIG = await parse();
     const isGitFlowInit = Boolean(GIT_CONFIG['gitflow "branch"']);
@@ -104,6 +152,7 @@ export default class GitFlow extends Plugin {
       execSync('git flow init', { stdio: 'inherit' });
     }
   }
+
   async getIncrementedVersion(options) {
     const git = simplegit();
     const gitStatus = await git.status();
@@ -161,6 +210,59 @@ export default class GitFlow extends Plugin {
     //     );
     //   return this.spinner.show({ task, label: 'npm version' });
     // };
+
+    // this.setContext({
+    //   gitCurrentBranch,
+    //   matchPrefix,
+    //   matchPolicies,
+    //   latestVersion: options.latestVersion
+    // });
+    const { gitCurrentBranch } = this.getContext();
+
+    const {
+      tagDependsOnCommit = true
+      // releaseDependsOnPush = true
+    } = this.options;
+    Git.prototype.release = async function() {
+      switch (gitCurrentBranch) {
+        case 'release':
+          execSync(`git flow release finish`, {
+            stdio: 'inherit'
+          });
+          break;
+        case 'hotfix':
+          break;
+        default:
+          this.commit();
+          this.tag();
+          break;
+      }
+
+      const { commit, tag, push } = this.options;
+      let isCommit = false;
+      await this.step({
+        enabled: commit,
+        task: () => {
+          isCommit = true;
+          this.commit();
+        },
+        label: 'Git commit',
+        prompt: 'commit'
+      });
+      if (tagDependsOnCommit && isCommit)
+        await this.step({
+          enabled: isCommit,
+          task: () => this.tag(),
+          label: 'Git tag',
+          prompt: 'tag'
+        });
+      await this.step({
+        enabled: push,
+        task: () => this.push(),
+        label: 'Git push',
+        prompt: 'push'
+      });
+    };
 
     npm.prototype.release = async function() {
       if (this.options.publish === false) return;
@@ -239,7 +341,7 @@ export default class GitFlow extends Plugin {
             },
             validate: (input) =>
               semver.validRange(input)
-                ? 'Tags that can be interpreted as valid semver ranges will be rejected.'
+                ? 'Tag name must not be a valid SemVer range.'
                 : true
           }
         };

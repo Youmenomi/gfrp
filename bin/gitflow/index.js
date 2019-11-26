@@ -2058,12 +2058,35 @@ const {
   Plugin
 } = require('release-it');
 
-const npm = require('release-it/lib/plugin/npm/npm'); // const versionTransformer = (context) => (input) =>
+const npm = require('release-it/lib/plugin/npm/npm');
+
+const Git = require('release-it/lib/plugin/git/Git');
+
+const GitHub = require('release-it/lib/plugin/github/GitHub'); // const versionTransformer = (context) => (input) =>
 //   semver.valid(input)
 //     ? semver.gt(input, context.latestVersion)
 //       ? green(input)
 //       : red(input)
 //     : redBright(input);
+
+
+const _ = require('lodash');
+
+const isCI = require('is-ci'); // const Config = require('release-it/lib/config');
+// Config.prototype.mergeOptions = function() {
+//   console.log('mergeOptions1111111');
+//   this.defaultConfig.github.draft = false;
+//   return _.defaultsDeep(
+//     {},
+//     this.constructorConfig,
+//     {
+//       ci: isCI || undefined
+//     },
+//     this.localConfig,
+//     this.defaultConfig
+//   );
+// };
+// console.log('mergeOptions000000', Config.prototype.options);
 
 
 const versionTransformer = context => input => semver.valid(input) ? semver.gt(input, context.latestVersion) ? chalk.green(input) : chalk.red(input) : chalk.redBright(input);
@@ -2127,6 +2150,30 @@ const getReleaseChoices = async context => {
 };
 
 class GitFlow extends Plugin {
+  constructor({
+    namespace,
+    options = {},
+    global = {},
+    container = {}
+  } = {}) {
+    super({
+      namespace,
+      options,
+      global,
+      container
+    });
+    this.config.defaultConfig.github.draft = true;
+    this.config.options = _.defaultsDeep({}, this.config.constructorConfig, {
+      ci: isCI || undefined
+    }, this.config.localConfig, this.config.defaultConfig);
+    const superInit = GitHub.prototype.init;
+
+    GitHub.prototype.init = async function () {
+      await superInit.call(this);
+      this.options = Object.freeze(this.getInitialOptions(this.config.getContext(), 'github'));
+    };
+  }
+
   async init() {
     const GIT_CONFIG = await parseGitConfig();
     const isGitFlowInit = Boolean(GIT_CONFIG['gitflow "branch"']);
@@ -2188,6 +2235,33 @@ class GitFlow extends Plugin {
     //       }
     //     );
     //   return this.spinner.show({ task, label: 'npm version' });
+    // };
+    // const { tagDependsOnCommit = true, releaseDependsOnPush = true} = this.options;
+    // Git.prototype.release = async function() {
+    //   const { commit, tag, push } = this.options;
+    //   let isCommit = false;
+    //   await this.step({
+    //     enabled: commit,
+    //     task: () => {
+    //       isCommit = true;
+    //       this.commit();
+    //     },
+    //     label: 'Git commit',
+    //     prompt: 'commit'
+    //   });
+    //   if(commitDependsOnTag && isCommit)
+    //   await this.step({
+    //     enabled: isCommit,
+    //     task: () => this.tag(),
+    //     label: 'Git tag',
+    //     prompt: 'tag'
+    //   });
+    //   await this.step({
+    //     enabled: push,
+    //     task: () => this.push(),
+    //     label: 'Git push',
+    //     prompt: 'push'
+    //   });
     // };
     npm.prototype.release = async function () {
       if (this.options.publish === false) return;
@@ -2255,7 +2329,7 @@ class GitFlow extends Plugin {
             transformer: context => input => {
               return semver.validRange(input) ? chalk.redBright(input) : chalk.green(input);
             },
-            validate: input => semver.validRange(input) ? 'Tags that can be interpreted as valid semver ranges will be rejected.' : true
+            validate: input => semver.validRange(input) ? 'Tag name must not be a valid SemVer range.' : true
           }
         };
         this.registerPrompts(prompts);
