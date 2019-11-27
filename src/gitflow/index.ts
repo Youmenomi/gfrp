@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import { type } from 'os';
 import semver from 'semver';
 import parse from 'parse-git-config';
 import bump from 'standard-version/lib/lifecycles/bump';
@@ -6,6 +7,7 @@ import simplegit from 'simple-git/promise';
 import { forEachSeries } from 'p-iteration';
 import { green, red, redBright, yellow } from 'chalk';
 import matcher from 'matcher';
+const { EOL } = require('os');
 const { Plugin } = require('release-it');
 const npm = require('release-it/lib/plugin/npm/npm');
 const Git = require('release-it/lib/plugin/git/Git');
@@ -14,7 +16,18 @@ const GitHub = require('release-it/lib/plugin/github/GitHub');
 const _ = require('lodash');
 const isCI = require('is-ci');
 
+type iGFConfig = {
+  master: string;
+  develop: string;
+  feature: string;
+  bugfix: string;
+  release: string;
+  support: string;
+  versiontag: string;
+};
+
 type iOpts = {
+  startArgs?: string;
   finArgs?: string;
   npmTags?: string[];
 };
@@ -186,18 +199,64 @@ export default class GitFlow extends Plugin {
   }
 
   async init() {
-    const GIT_CONFIG = await parse();
-    const isGitFlowInit = Boolean(GIT_CONFIG['gitflow "branch"']);
+    const {
+      gitflow
+    }: { gitflow: boolean; polycies: iConfig } & iOpts = this.options;
 
-    if (!isGitFlowInit && (await this.promptGitFlowInit())) {
-      execSync('git flow init', { stdio: 'inherit' });
+    if (gitflow) {
+      if (this.global.isCI) {
+        throw new Error(
+          'failed: Git Flow workflow does not support CI mode.' +
+            EOL +
+            'Alternatively, use `--no-gfrp.gitflow` to release without git-flow workflow' +
+            ' (or save `"gfrp.gitflow": false` in the configuration).'
+        );
+      }
+
+      const GIT_CONFIG = await parse();
+      const isGitFlowInit = Boolean(GIT_CONFIG['gitflow "branch"']);
+      if (!isGitFlowInit) {
+        this.registerPrompts({
+          gitflowInit: {
+            type: 'confirm',
+            message: () =>
+              'Detected that Git flow is not installed. Do you want to install it?',
+            default: true
+          }
+        });
+        if (await this.promptGitFlowInit()) {
+          execSync('git flow init', { stdio: 'inherit' });
+        } else {
+          throw new Error(
+            'failed: Git flow is not installed.' +
+              EOL +
+              'Alternatively, use `--no-gfrp.gitflow` to release without git-flow workflow' +
+              ' (or save `"gfrp.gitflow": false` in the configuration).'
+          );
+        }
+      }
+      const gfConfig: iGFConfig = {
+        ...GIT_CONFIG['gitflow "branch"'],
+        ...GIT_CONFIG['gitflow "prefix"']
+      };
+      this.setContext({ gfConfig });
     }
-  }
 
-  async getIncrementedVersion(options) {
     const git = simplegit();
     const gitStatus = await git.status();
     const gitCurrentBranch = gitStatus.current;
+
+    const { gfConfig }: { gfConfig: iGFConfig } = this.getContext();
+
+    if (gfConfig) {
+      switch (gitCurrentBranch) {
+        case gfConfig.master:
+          await this.gfSelectAction();
+          break;
+        case gfConfig.develop:
+          break;
+      }
+    }
 
     const gfrpConfig = this.getContext();
 
@@ -222,9 +281,71 @@ export default class GitFlow extends Plugin {
     this.setContext({
       gitCurrentBranch,
       matchPrefix,
-      matchPolicies,
-      latestVersion: options.latestVersion
+      matchPolicies
     });
+
+    // gfConfig.
+
+    //   switch (gitCurrentBranch.split('/')[0]) {
+    //     case gfMaster:
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     case 'gfDevelop':
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     case 'feature':
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     case 'release':
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     case 'hotfix':
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     default:
+    //       this.commit();
+    //       this.tag();
+    //       break;
+    //   }
+  }
+
+  gfSelectAction() {
+    this.registerPrompts({
+      gfSelectAction: {
+        type: 'list',
+        message: () => 'Recommended actions:',
+        choices: () => [
+          {
+            name: 'Start a New Feature',
+            value: ['feature', 'start']
+          },
+          {
+            name: 'Start a New Release',
+            value: ['release', 'start']
+          },
+          { name: 'Start a New Hotfix', value: ['hotfix', 'start'] },
+          { name: 'Finish Feature', value: ['feature', 'finish'] },
+          { name: 'Finish Release', value: ['release', 'finish'] },
+          { name: 'Finish Hotfix', value: ['hotfix', 'finish'] }
+        ],
+        pageSize: 9
+      }
+    });
+    return this.asyncPromptStep({ prompt: 'gfSelectAction' });
+  }
+
+  async getIncrementedVersion(options) {
+    this.setContext({ latestVersion: options.latestVersion });
 
     this.registerPrompts(await this.createPrompts());
     const policy = await this.promptReleaseVersion();
@@ -269,7 +390,7 @@ export default class GitFlow extends Plugin {
           const prompts = {
             finArgs: {
               type: 'checkbox',
-              message: () => 'Select a npm-dist-tag:',
+              message: () => 'Select options to finish feature:',
               choices: () => [
                 {
                   name: '-r rebase instead of merge',
@@ -365,6 +486,7 @@ export default class GitFlow extends Plugin {
       });
     };
 
+    const npmTags = this.getContext().policy.npmTags;
     npm.prototype.release = async function() {
       if (this.options.publish === false) return;
 
@@ -390,13 +512,15 @@ export default class GitFlow extends Plugin {
       if (this.options.tag) {
         tag = this.options.tag;
       } else if (this.global.isCI) {
-        tag =
-          this.getContext().matchPolicies[0] ||
-          (await this.resolveTag(version));
+        tag = npmTags[0] || (await this.resolveTag(version));
       } else {
         const choices: any[] = [];
 
-        if (this.getContext().isNewPackage) {
+        if (npmTags) {
+          npmTags.forEach((value) => {
+            choices.push({ name: value, value });
+          });
+        } else if (this.getContext().isNewPackage) {
           const DEFAULT_TAG = 'latest';
           const DEFAULT_TAG_PRERELEASE = 'next';
           choices.push(
@@ -517,6 +641,15 @@ export default class GitFlow extends Plugin {
     return new Promise((resolve) => {
       this.step({
         prompt: 'gitflowInit',
+        task: resolve
+      });
+    });
+  }
+
+  asyncPromptStep(options) {
+    return new Promise((resolve) => {
+      this.step({
+        ...options,
         task: resolve
       });
     });

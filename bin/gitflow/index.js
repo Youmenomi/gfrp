@@ -2053,6 +2053,10 @@ function injectInclude(input, cwd) {
 var parseGitConfig = parse;
 
 const {
+  EOL
+} = require('os');
+
+const {
   Plugin
 } = require('release-it');
 
@@ -2193,17 +2197,35 @@ class GitFlow extends Plugin {
   }
 
   async init() {
-    const GIT_CONFIG = await parseGitConfig();
-    const isGitFlowInit = Boolean(GIT_CONFIG['gitflow "branch"']);
+    console.log('options:', this.options);
+    console.log('Context:', this.getContext());
+    const {
+      gitflow
+    } = this.options;
 
-    if (!isGitFlowInit && (await this.promptGitFlowInit())) {
-      child_process.execSync('git flow init', {
-        stdio: 'inherit'
-      });
+    if (gitflow) {
+      const GIT_CONFIG = await parseGitConfig();
+      const isGitFlowInit = Boolean(GIT_CONFIG['gitflow "branch"']);
+
+      if (!isGitFlowInit) {
+        this.registerPrompts({
+          gitflowInit: {
+            type: 'confirm',
+            message: () => 'Detected that Git flow is not installed. Do you want to install it?',
+            default: true
+          }
+        });
+
+        if (await this.promptGitFlowInit()) {
+          child_process.execSync('git flow init', {
+            stdio: 'inherit'
+          });
+        } else {
+          throw new Error('failed: Git flow is not installed.' + EOL + 'Alternatively, use `--no-gfrp.gitflow` to release without git-flow workflow' + ' (or save `"gfrp.gitflow": false` in the configuration).');
+        }
+      }
     }
-  }
 
-  async getIncrementedVersion(options) {
     const git = simplegit();
     const gitStatus = await git.status();
     const gitCurrentBranch = gitStatus.current;
@@ -2231,7 +2253,46 @@ class GitFlow extends Plugin {
     this.setContext({
       gitCurrentBranch,
       matchPrefix,
-      matchPolicies,
+      matchPolicies
+    });
+    const gfConfig = { ...GIT_CONFIG['gitflow "branch"'],
+      ...GIT_CONFIG['gitflow "prefix"']
+    }; // gfConfig.
+    //   switch (gitCurrentBranch.split('/')[0]) {
+    //     case gfMaster:
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     case 'gfDevelop':
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     case 'feature':
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     case 'release':
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     case 'hotfix':
+    //       execSync(`git flow release finish`, {
+    //         stdio: 'inherit'
+    //       });
+    //       break;
+    //     default:
+    //       this.commit();
+    //       this.tag();
+    //       break;
+    //   }
+  }
+
+  async getIncrementedVersion(options) {
+    this.setContext({
       latestVersion: options.latestVersion
     });
     this.registerPrompts((await this.createPrompts()));
@@ -2279,7 +2340,7 @@ class GitFlow extends Plugin {
           const prompts = {
             finArgs: {
               type: 'checkbox',
-              message: () => 'Select a npm-dist-tag:',
+              message: () => 'Select options to finish feature:',
               choices: () => [{
                 name: '-r rebase instead of merge',
                 value: 'r'
@@ -2369,6 +2430,8 @@ class GitFlow extends Plugin {
       });
     };
 
+    const npmTags = this.getContext().policy.npmTags;
+
     npm.prototype.release = async function () {
       if (this.options.publish === false) return;
       this.registerPrompts({
@@ -2391,11 +2454,18 @@ class GitFlow extends Plugin {
       if (this.options.tag) {
         tag = this.options.tag;
       } else if (this.global.isCI) {
-        tag = this.getContext().matchPolicies[0] || (await this.resolveTag(version));
+        tag = npmTags[0] || (await this.resolveTag(version));
       } else {
         const choices = [];
 
-        if (this.getContext().isNewPackage) {
+        if (npmTags) {
+          npmTags.forEach(value => {
+            choices.push({
+              name: value,
+              value
+            });
+          });
+        } else if (this.getContext().isNewPackage) {
           const DEFAULT_TAG = 'latest';
           const DEFAULT_TAG_PRERELEASE = 'next';
           choices.push({
