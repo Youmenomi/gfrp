@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
 import { type } from 'os';
+import readline from 'readline';
 import semver from 'semver';
 import parse from 'parse-git-config';
 import bump from 'standard-version/lib/lifecycles/bump';
@@ -7,20 +8,20 @@ import simplegit from 'simple-git/promise';
 import { forEachSeries } from 'p-iteration';
 import { green, red, redBright, yellow } from 'chalk';
 import matcher from 'matcher';
+
+import _ from 'lodash';
 const { EOL } = require('os');
 const { Plugin } = require('release-it');
 const npm = require('release-it/lib/plugin/npm/npm');
 const Git = require('release-it/lib/plugin/git/Git');
 const GitHub = require('release-it/lib/plugin/github/GitHub');
-
-const _ = require('lodash');
 const isCI = require('is-ci');
 
 type iGFConfig = {
   master: string;
   develop: string;
   feature: string;
-  bugfix: string;
+  hotfix: string;
   release: string;
   support: string;
   versiontag: string;
@@ -41,6 +42,19 @@ type iConfig = {
     | iPrereleaseWithiOpts
     | (string | iPrereleaseWithiOpts)[];
 } & iOpts;
+
+type iSelectActioin = [
+  'master' | 'develop' | 'feature' | 'release' | 'hotfix',
+  'start' | 'finish'
+];
+
+const gfWorkflow = [
+  'master',
+  'develop',
+  'feature',
+  'release',
+  'hotfix'
+] as const;
 
 const versionTransformer = (context) => (input) =>
   semver.valid(input)
@@ -199,9 +213,17 @@ export default class GitFlow extends Plugin {
   }
 
   async init() {
+    const git = simplegit();
+    const gitStatus = await git.status();
+    const gitCurrentBranch = gitStatus.current;
+
     const {
-      gitflow
-    }: { gitflow: boolean; polycies: iConfig } & iOpts = this.options;
+      gitflow,
+      policyset
+    }: {
+      gitflow: boolean;
+      policyset: { [key: string]: iConfig };
+    } & iOpts = this.options;
 
     if (gitflow) {
       if (this.global.isCI) {
@@ -239,36 +261,57 @@ export default class GitFlow extends Plugin {
         ...GIT_CONFIG['gitflow "branch"'],
         ...GIT_CONFIG['gitflow "prefix"']
       };
-      this.setContext({ gfConfig });
+
+      let gfCurrent;
+      gfWorkflow.some((name) => {
+        if (gitCurrentBranch.indexOf(gfConfig[name]) === 0) {
+          gfCurrent = name;
+          return true;
+        }
+        return false;
+      });
+
+      this.setContext({ gfConfig, gfCurrent });
+
+      // Object.keys(gfConfig).some((key) => {
+      //   gfConfig[key]
+
+      // });
+
+      // gfConfig.
+      // gfWorkflow
+      // if(position)
+      // position
+
+      // GIT_CONFIG[`[gitflow "branch.${gitCurrentBranch}"]`].base
+      // [gitflow "branch.feature/dotest"]
+
+      // // gfConfig.master ===
+      // switch (gitCurrentBranch) {
+      // }
     }
 
-    const git = simplegit();
-    const gitStatus = await git.status();
-    const gitCurrentBranch = gitStatus.current;
-
-    const { gfConfig }: { gfConfig: iGFConfig } = this.getContext();
-
-    if (gfConfig) {
-      switch (gitCurrentBranch) {
-        case gfConfig.master:
-          await this.gfSelectAction();
-          break;
-        case gfConfig.develop:
-          break;
-      }
-    }
-
-    const gfrpConfig = this.getContext();
+    // 'feature/*': {
+    //   release: true,
+    //   prerelease: [
+    //     'alpha',
+    //     '%r',
+    //     { name: 'alpha2', npmTags: ['alpha', 'next'] },
+    //     { name: 'alpha3', finArgs: 'rFkDS' }
+    //   ],
+    //   finArgs: 'rFkDS',
+    //   npmTags: ['alpha', 'next']
+    // }
 
     let matchPrefix: string | undefined;
     let matchPolicies: string | iConfig | undefined;
-    Object.keys(gfrpConfig).some((prefix) => {
-      const r = matcher.isMatch(gitCurrentBranch, prefix);
-      if (r) {
+    Object.keys(policyset).some((prefix) => {
+      if (matcher.isMatch(gitCurrentBranch, prefix)) {
         matchPrefix = prefix;
-        matchPolicies = gfrpConfig[prefix];
+        matchPolicies = policyset[prefix];
+        return true;
       }
-      return r;
+      return false;
     });
 
     if (!matchPolicies) {
@@ -283,6 +326,93 @@ export default class GitFlow extends Plugin {
       matchPrefix,
       matchPolicies
     });
+
+    // if(matchPolicies.release){
+
+    // }
+
+    // const choices = [];
+
+    // const { gfConfig }: { gfConfig: iGFConfig } = this.getContext();
+    // if (gfConfig) {
+    //   if (gfConfig.master === gitCurrentBranch) {
+    //     // choices.push
+    //   }
+    // } else {
+    // }
+
+    // const choices = [];
+    // choices;
+
+    // this.registerPrompts({
+    //   gfrpSelect: {
+    //     type: 'list',
+    //     message: () => 'Select one:',
+    //     choices: () => {
+    //       return [];
+    //     }
+    //   }
+    // });
+
+    // const gfAction = await this.gfSelectAction();
+
+    // if (gfAction[1] === 'finish') {
+    //   const candidates = execSync(
+    //     `git branch --no-color --list '${
+    //       gfConfig[gfAction[0] as 'feature' | 'release' | 'hotfix']
+    //     }*'`
+    //   )
+    //     .toString()
+    //     .replace('* ', '')
+    //     .replace('  ', '')
+    //     .split('\n')
+    //     .slice(0, -1);
+
+    //   if (candidates.length === 0) {
+    //   } else {
+    //     await this.gfSelectBranch(candidates);
+    //   }
+    // } else {
+    // }
+    // // (develop * feature) / dotest;
+    // // master;
+    // gfConfig.asd.dff.dff;
+
+    // if (gfConfig) {
+    //   switch (gitCurrentBranch) {
+    //     case gfConfig.master:
+    //       await this.gfSelectAction();
+    //       break;
+    //     case gfConfig.develop:
+    //       break;
+    //   }
+    // }
+
+    // const gfrpConfig = this.getContext();
+
+    // let matchPrefix: string | undefined;
+    // let matchPolicies: string | iConfig | undefined;
+    // Object.keys(gfrpConfig).some((prefix) => {
+    //   const r = matcher.isMatch(gitCurrentBranch, prefix);
+    //   if (r) {
+    //     matchPrefix = prefix;
+    //     matchPolicies = gfrpConfig[prefix];
+    //   }
+    //   return r;
+    // });
+
+    // if (!matchPolicies) {
+    //   this.log.warn('No corresponding release policy found.');
+    //   return null;
+    // } else if (typeof matchPolicies === 'string') {
+    //   throw new TypeError(`failed: ${matchPolicies}`);
+    // }
+
+    // this.setContext({
+    //   gitCurrentBranch,
+    //   matchPrefix,
+    //   matchPolicies
+    // });
 
     // gfConfig.
 
@@ -319,7 +449,7 @@ export default class GitFlow extends Plugin {
     //   }
   }
 
-  gfSelectAction() {
+  async gfSelectAction() {
     this.registerPrompts({
       gfSelectAction: {
         type: 'list',
@@ -334,18 +464,89 @@ export default class GitFlow extends Plugin {
             value: ['release', 'start']
           },
           { name: 'Start a New Hotfix', value: ['hotfix', 'start'] },
+          { name: 'Other Action...', value: null }
+        ]
+      },
+      gfSelectOther: {
+        type: 'list',
+        message: () => 'Recommended actions:',
+        choices: () => [
           { name: 'Finish Feature', value: ['feature', 'finish'] },
           { name: 'Finish Release', value: ['release', 'finish'] },
-          { name: 'Finish Hotfix', value: ['hotfix', 'finish'] }
-        ],
-        pageSize: 9
+          { name: 'Finish Hotfix', value: ['hotfix', 'finish'] },
+          { name: 'Other Action...', value: null }
+        ]
       }
     });
-    return this.asyncPromptStep({ prompt: 'gfSelectAction' });
+
+    let result = (await this.asyncPromptStep({
+      prompt: 'gfSelectAction'
+    })) as iSelectActioin;
+    if (!result) {
+      this.deleteCurrentLine();
+      result = (await this.asyncPromptStep({
+        prompt: 'gfSelectOther'
+      })) as iSelectActioin;
+    }
+
+    if (!result) {
+      this.deleteCurrentLine();
+      result = (await this.gfSelectAction()) as iSelectActioin;
+      return result;
+    }
+
+    return result;
+  }
+
+  gfSelectBranch(branches: string[]) {
+    this.registerPrompts({
+      gfSelectBranch: {
+        type: 'list',
+        message: () => 'Select one:',
+        choices: () => {
+          return branches.map((name) => {
+            return { name, value: name };
+          });
+        }
+      }
+    });
+
+    return this.asyncPromptStep({
+      prompt: 'gfSelectBranch'
+    });
+  }
+
+  deleteCurrentLine() {
+    readline.moveCursor(process.stdout, 0, -1);
+    readline.clearScreenDown(process.stdout);
   }
 
   async getIncrementedVersion(options) {
     this.setContext({ latestVersion: options.latestVersion });
+
+    const choices = await this.getReleaseChoices();
+    console.log('choices:', choices);
+
+    // const { gfConfig }: { gfConfig: iGFConfig } = this.getContext();
+    // if (gfConfig) {
+    //   if (gfConfig.master === gitCurrentBranch) {
+    //     // choices.push
+    //   }
+    // } else {
+    // }
+
+    // const choices = [];
+    // choices;
+
+    // this.registerPrompts({
+    //   gfrpSelect: {
+    //     type: 'list',
+    //     message: () => 'Select one:',
+    //     choices: () => {
+    //       return [];
+    //     }
+    //   }
+    // });
 
     this.registerPrompts(await this.createPrompts());
     const policy = await this.promptReleaseVersion();
@@ -353,6 +554,121 @@ export default class GitFlow extends Plugin {
     this.setContext({ policy });
     console.log('policy:', policy);
     return policy.newVersion;
+  }
+
+  async getReleaseChoices() {
+    const { matchPolicies }: { matchPolicies: iConfig } = this.getContext();
+    const choices: { name: string; value: any }[] = [];
+
+    if (matchPolicies.release) {
+      choices.push(await this.createChoice(matchPolicies.release));
+    }
+
+    if (matchPolicies.prerelease) {
+      const policies = Array.isArray(matchPolicies.prerelease)
+        ? matchPolicies.prerelease
+        : [matchPolicies.prerelease];
+
+      await forEachSeries(policies, async (policy) => {
+        choices.push(
+          await this.createChoice(
+            policy,
+            typeof policy === 'string' ? policy : policy.name
+          )
+        );
+      });
+    }
+
+    const otherChoice = {
+      name: 'Other, please specify...',
+      value: null
+    };
+
+    return [...choices, otherChoice];
+  }
+  async createChoice(
+    policy: boolean | iOpts | string | iPrereleaseWithiOpts,
+    prerelease?: string
+  ) {
+    const {
+      matchPolicies
+    }: {
+      matchPolicies: iConfig;
+    } = this.getContext();
+
+    const { finArgs, npmTags } = policy as iOpts;
+    const newVersion = await this.getNewVersion(prerelease);
+    return {
+      name: newVersion,
+      value: _.defaults(
+        { newVersion, finArgs, npmTags },
+        { finArgs: matchPolicies.finArgs, npmTags: matchPolicies.npmTags }
+      )
+    };
+  }
+  async getNewVersion(prerelease?: string) {
+    const {
+      gitCurrentBranch,
+      latestVersion,
+      matchPrefix,
+      gfCurrent
+    }: {
+      gitCurrentBranch: string;
+      latestVersion: string;
+      matchPrefix: string;
+      gfCurrent: typeof gfWorkflow;
+    } = this.getContext();
+    // const args: any = {};
+    // args.silent = true;
+    // args.dryRun = true;
+    // args.skip = {};
+    // args.skip.changelog = true;
+
+    //git tag --list '*-alpha.*'
+    //git tag --merged
+
+    let hasHash = false;
+    if (prerelease) {
+      if (prerelease.includes('%r')) {
+        const r = gitCurrentBranch.substr(matchPrefix.split('*')[0].length);
+        prerelease = prerelease.replace(/%r/g, r);
+      }
+      if (prerelease.includes('%h')) {
+        hasHash = true;
+        const h = execSync('git log --format="%H" -n 1')
+          .toString()
+          .substr(0, 7);
+        prerelease = prerelease.replace(/%h/g, h);
+      }
+
+      const tags = execSync(`git tag`)
+        .toString()
+        .split('\n')
+        .slice(0, -1);
+    }
+
+    // hasHash
+
+    const searchedBranch;
+
+    execSync(`git tag --merged ${gfCurrent} -l `);
+    `git tag --list '*-${searchedBranch}.*'`;
+    if (!hasHash) {
+      execSync(`git tag --merged ${gfCurrent} -l `);
+    }
+
+    // args.tagPrefix = 'v';
+    // args.releaseAs = '2.0.0';
+    // args.firstRelease = true;
+
+    // let newVersion = await semver.(args, latestVersion);
+
+    // if (prerelease && hasHash) {
+    //   const i = newVersion.lastIndexOf('.');
+    //   newVersion = newVersion.substr(0, i);
+    // }
+
+    // return newVersion;
   }
 
   bump(version) {

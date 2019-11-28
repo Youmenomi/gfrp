@@ -327,25 +327,32 @@ dotenv.config();
     git: { requireCleanWorkingDir: false },
     plugins: {
       [path.resolve('./bin/gitflow')]: {
-        master: 'You should not release directly on the master branch.',
-        develop: {
-          prerelease: [{ name: 'alpha', npmTags: ['alpha', 'next'] }, '%h']
-        },
-        'feature/*': {
-          prerelease: ['alpha', '%r'],
-          finArgs: 'rFkDS',
-          npmTags: ['alpha', 'next']
-        },
-        'release/*': [
-          { release: true },
-          { prerelease: 'beta' },
-          { prerelease: 'rc' }
-        ],
-        'hotfix/*': [
-          { release: true },
-          { prerelease: 'beta' },
-          { prerelease: 'rc' }
-        ]
+        gitlow: true,
+        policyset: {
+          master: 'You should not release directly on the master branch.',
+          develop: {
+            prerelease: [{ name: 'alpha', npmTags: ['alpha', 'next'] }, '%h']
+          },
+          'feature/*': {
+            release: true,
+            prerelease: [
+              'alpha',
+              '%r',
+              { name: 'alpha2', npmTags: ['alpha', 'next'] },
+              { name: 'alpha3', finArgs: 'rFkDS' }
+            ],
+            finArgs: 'rFkDS',
+            npmTags: ['alpha', 'next']
+          },
+          'release/*': {
+            release: true,
+            prerelease: ['beta', 'rc']
+          },
+          'hotfix/*': {
+            release: true,
+            prerelease: ['beta', 'rc']
+          }
+        }
       },
       '@release-it/conventional-changelog': {
         preset: 'angular',
