@@ -8,6 +8,9 @@ import simplegit from 'simple-git/promise';
 import { forEachSeries } from 'p-iteration';
 import { green, red, redBright, yellow } from 'chalk';
 import matcher from 'matcher';
+// import conventionalRecommendedBump, {
+//   releaseType
+// } from 'conventional-recommended-bump';
 
 import _ from 'lodash';
 const { EOL } = require('os');
@@ -16,6 +19,7 @@ const npm = require('release-it/lib/plugin/npm/npm');
 const Git = require('release-it/lib/plugin/git/Git');
 const GitHub = require('release-it/lib/plugin/github/GitHub');
 const isCI = require('is-ci');
+const gitSemverTags = require('git-semver-tags');
 
 type iGFConfig = {
   master: string;
@@ -43,17 +47,17 @@ type iConfig = {
     | (string | iPrereleaseWithiOpts)[];
 } & iOpts;
 
-type iSelectActioin = [
-  'master' | 'develop' | 'feature' | 'release' | 'hotfix',
-  'start' | 'finish'
-];
+type gfDefault = Omit<iGFConfig, 'versiontag'>;
+
+type iSelectActioin = [keyof gfDefault, 'start' | 'finish'];
 
 const gfWorkflow = [
   'master',
   'develop',
   'feature',
   'release',
-  'hotfix'
+  'hotfix',
+  'support'
 ] as const;
 
 const versionTransformer = (context) => (input) =>
@@ -479,23 +483,22 @@ export default class GitFlow extends Plugin {
       }
     });
 
-    let result = (await this.asyncPromptStep({
+    let result = await this.asyncPromptStep({
       prompt: 'gfSelectAction'
-    })) as iSelectActioin;
+    });
     if (!result) {
       this.deleteCurrentLine();
-      result = (await this.asyncPromptStep({
+      result = await this.asyncPromptStep({
         prompt: 'gfSelectOther'
-      })) as iSelectActioin;
+      });
     }
 
     if (!result) {
       this.deleteCurrentLine();
-      result = (await this.gfSelectAction()) as iSelectActioin;
-      return result;
+      result = await this.gfSelectAction();
     }
 
-    return result;
+    return result as iSelectActioin;
   }
 
   gfSelectBranch(branches: string[]) {
@@ -560,9 +563,9 @@ export default class GitFlow extends Plugin {
     const { matchPolicies }: { matchPolicies: iConfig } = this.getContext();
     const choices: { name: string; value: any }[] = [];
 
-    if (matchPolicies.release) {
-      choices.push(await this.createChoice(matchPolicies.release));
-    }
+    // if (matchPolicies.release) {
+    //   choices.push(await this.createChoice(matchPolicies.release));
+    // }
 
     if (matchPolicies.prerelease) {
       const policies = Array.isArray(matchPolicies.prerelease)
@@ -579,6 +582,10 @@ export default class GitFlow extends Plugin {
       });
     }
 
+    // if(){
+
+    // }
+
     const otherChoice = {
       name: 'Other, please specify...',
       value: null
@@ -587,7 +594,7 @@ export default class GitFlow extends Plugin {
     return [...choices, otherChoice];
   }
   async createChoice(
-    policy: boolean | iOpts | string | iPrereleaseWithiOpts,
+    policy: string | iPrereleaseWithiOpts,
     prerelease?: string
   ) {
     const {
@@ -606,7 +613,7 @@ export default class GitFlow extends Plugin {
       )
     };
   }
-  async getNewVersion(prerelease?: string) {
+  async getNewVersion(prereleaseFormula: string) {
     const {
       gitCurrentBranch,
       latestVersion,
@@ -616,59 +623,146 @@ export default class GitFlow extends Plugin {
       gitCurrentBranch: string;
       latestVersion: string;
       matchPrefix: string;
-      gfCurrent: typeof gfWorkflow;
+      gfCurrent: gfDefault;
     } = this.getContext();
-    // const args: any = {};
-    // args.silent = true;
-    // args.dryRun = true;
-    // args.skip = {};
-    // args.skip.changelog = true;
 
-    //git tag --list '*-alpha.*'
-    //git tag --merged
+    // this.standardVersionBump('1.1.1.1');
 
-    let hasHash = false;
-    if (prerelease) {
-      if (prerelease.includes('%r')) {
-        const r = gitCurrentBranch.substr(matchPrefix.split('*')[0].length);
-        prerelease = prerelease.replace(/%r/g, r);
-      }
-      if (prerelease.includes('%h')) {
-        hasHash = true;
-        const h = execSync('git log --format="%H" -n 1')
-          .toString()
-          .substr(0, 7);
-        prerelease = prerelease.replace(/%h/g, h);
-      }
-
-      const tags = execSync(`git tag`)
+    let prerelease: string;
+    // if (prereleaseFormula) {
+    prerelease = prereleaseFormula;
+    if (prerelease.includes('%r')) {
+      const r = gitCurrentBranch.substr(matchPrefix.split('*')[0].length);
+      prerelease = prerelease.replace(/%r/g, r);
+    }
+    const hasHash = prerelease.includes('%h');
+    if (hasHash) {
+      const h = execSync('git log --format="%H" -n 1')
         .toString()
-        .split('\n')
-        .slice(0, -1);
+        .substr(0, 7);
+      prerelease = prerelease.replace(/%h/g, h);
     }
-
-    // hasHash
-
-    const searchedBranch;
-
-    execSync(`git tag --merged ${gfCurrent} -l `);
-    `git tag --list '*-${searchedBranch}.*'`;
-    if (!hasHash) {
-      execSync(`git tag --merged ${gfCurrent} -l `);
-    }
-
-    // args.tagPrefix = 'v';
-    // args.releaseAs = '2.0.0';
-    // args.firstRelease = true;
-
-    // let newVersion = await semver.(args, latestVersion);
-
-    // if (prerelease && hasHash) {
-    //   const i = newVersion.lastIndexOf('.');
-    //   newVersion = newVersion.substr(0, i);
     // }
 
-    // return newVersion;
+    let newVersion: string;
+
+    const isPrereleased = semver.prerelease(latestVersion);
+    if (isPrereleased && isPrereleased[0] !== prerelease) {
+      const latestRaw = semver.coerce(latestVersion)!.raw;
+      const bumpRaw = semver.coerce(
+        await this.standardVersionBump(latestVersion, {
+          prerelease: isPrereleased[0]
+        })
+      )!.raw;
+      if (bumpRaw !== latestRaw) {
+        newVersion = `${bumpRaw}-${prerelease}${hasHash ? '' : '.0'}`;
+      } else {
+        const matchTag = await this.getMatchPretag(latestRaw, prerelease);
+        if (matchTag) {
+          const numBuild = Number(matchTag.split('.').pop());
+          newVersion = `${latestRaw}-${prerelease}.${numBuild + 1}`;
+        } else {
+          newVersion = `${latestRaw}-${prerelease}${hasHash ? '' : '.0'}`;
+        }
+      }
+    } else {
+      newVersion = await this.standardVersionBump(latestVersion, {
+        prerelease
+      });
+    }
+
+    return newVersion;
+  }
+
+  // args.tagPrefix = 'v';
+  // args.releaseAs = '2.0.0';
+  // args.firstRelease = true;
+  standardVersionBump(
+    latest: string,
+    opt?: { prerelease?: string; tagPrefix?: string }
+  ) {
+    let args: any = {};
+    args.silent = true;
+    args.dryRun = true;
+    args.skip = {};
+    args.skip.changelog = true;
+    args = { ...args, ...opt };
+    return bump(args, latest);
+  }
+
+  async getLastTag(prerelease?: string) {
+    let lastTag;
+    const tags = await this.getTags();
+    tags.some((tag) => {
+      const ar = semver.prerelease(tag);
+      if (prerelease) {
+        if (ar && ar[0] === prerelease) {
+          lastTag = tag;
+          return true;
+        } else {
+          return false;
+        }
+      } else if (!ar) {
+        lastTag = tag;
+        return true;
+      } else {
+        return false;
+      }
+    });
+    return lastTag;
+  }
+
+  async getMatchPretag(version: string, prerelease: string) {
+    let matchPretag: string | undefined;
+    const tags = await this.getTags();
+    tags.some((tag) => {
+      const obj = semver.coerce(tag);
+      const ar = semver.prerelease(tag);
+      if (ar && ar[0] === prerelease && obj && obj.version === version) {
+        matchPretag = tag;
+        return true;
+      } else {
+        return false;
+      }
+    });
+    return matchPretag;
+  }
+
+  getTags() {
+    return new Promise<string[]>((resolve, reject) => {
+      gitSemverTags(function(error: Error, tags: string[]) {
+        if (error) reject(error);
+        else resolve(tags);
+      });
+    });
+  }
+  // getRecommendedIncrement() {
+  //   return new Promise<releaseType>((resolve, reject) => {
+  //     conventionalRecommendedBump(
+  //       { preset: `angular` },
+  //       (error, recommendation) => {
+  //         if (error) reject(error);
+  //         else resolve(recommendation.releaseType);
+  //       }
+  //     );
+  //   });
+  // }
+  async gfBump() {
+    const prerelease = 'alpha';
+
+    const tags = await this.getTags(prerelease);
+    const latest = tags[0];
+
+    const args: any = {};
+    args.silent = true;
+    args.dryRun = true;
+    args.skip = {};
+    args.skip.changelog = true;
+    const newVersion = await bump(args, latest);
+
+    // const recommendedIncrement = await this.getRecommendedIncrement();
+
+    console.log(newVersion);
   }
 
   bump(version) {
@@ -917,7 +1011,7 @@ export default class GitFlow extends Plugin {
   }
 
   async createPrompts() {
-    const choices = await getReleaseChoices(this.getContext());
+    const choices = await this.getReleaseChoices();
     return {
       releaseList: {
         type: 'list',

@@ -93,7 +93,7 @@ dotenv.config();
   //   }
   // };
 
-  const questions: prompts.PromptObject<string>[] = [];
+  // const questions: prompts.PromptObject<string>[] = [];
 
   type iConfig = {
     release?: boolean;
@@ -101,220 +101,220 @@ dotenv.config();
     options?: any;
     npm?: { tag: string | string[] };
   };
-  const branchConfig: { [key: string]: string | iConfig | iConfig[] } = {
-    master: 'You should not release directly on the master branch.',
-    develop: [
-      { prerelease: 'alpha', npm: { tag: ['alpha', 'next'] } },
-      { prerelease: '%h' }
-    ],
-    'feature/*': [{ prerelease: 'alpha' }, { prerelease: '%r' }],
-    'release/*': [
-      { release: true },
-      { prerelease: 'beta' },
-      { prerelease: 'rc' }
-    ],
-    'hotfix/*': [
-      { release: true },
-      { prerelease: 'beta' },
-      { prerelease: 'rc' }
-    ]
-  };
+  // const branchConfig: { [key: string]: string | iConfig | iConfig[] } = {
+  //   master: 'You should not release directly on the master branch.',
+  //   develop: [
+  //     { prerelease: 'alpha', npm: { tag: ['alpha', 'next'] } },
+  //     { prerelease: '%h' }
+  //   ],
+  //   'feature/*': [{ prerelease: 'alpha' }, { prerelease: '%r' }],
+  //   'release/*': [
+  //     { release: true },
+  //     { prerelease: 'beta' },
+  //     { prerelease: 'rc' }
+  //   ],
+  //   'hotfix/*': [
+  //     { release: true },
+  //     { prerelease: 'beta' },
+  //     { prerelease: 'rc' }
+  //   ]
+  // };
 
-  let configName: undefined | string;
-  Object.keys(branchConfig).some((value) => {
-    if (matcher.isMatch(currentBranch, value)) configName = value;
-  });
+  // let configName: undefined | string;
+  // Object.keys(branchConfig).some((value) => {
+  //   if (matcher.isMatch(currentBranch, value)) configName = value;
+  // });
 
-  const PROMPT_SPECIFY: prompts.PromptObject<string> = {
-    type: (prev) => (!prev ? 'text' : prev === 'specify' ? 'text' : null),
-    name: 'version',
-    message: 'enter the specify version'
-  };
-  const PROMPT_COMMIT: prompts.PromptObject<string> = {
-    type: 'confirm',
-    name: 'isCommit',
-    message: 'commit',
-    initial: true
-  };
-  const PROMPT_PUSH: prompts.PromptObject<string> = {
-    type: 'confirm',
-    name: 'isPush',
-    message: 'push',
-    initial: false
-  };
+  // const PROMPT_SPECIFY: prompts.PromptObject<string> = {
+  //   type: (prev) => (!prev ? 'text' : prev === 'specify' ? 'text' : null),
+  //   name: 'version',
+  //   message: 'enter the specify version'
+  // };
+  // const PROMPT_COMMIT: prompts.PromptObject<string> = {
+  //   type: 'confirm',
+  //   name: 'isCommit',
+  //   message: 'commit',
+  //   initial: true
+  // };
+  // const PROMPT_PUSH: prompts.PromptObject<string> = {
+  //   type: 'confirm',
+  //   name: 'isPush',
+  //   message: 'push',
+  //   initial: false
+  // };
 
-  type iChoice = {
-    title: string;
-    value: string;
-  };
+  // type iChoice = {
+  //   title: string;
+  //   value: string;
+  // };
 
-  const createChoice = async (config: iConfig, configName: string) => {
-    if (config.release !== true && typeof config.prerelease !== 'string') {
-      throw new Error('The release policy of the branch is incorrect.');
-    }
-
-    const args: any = {};
-    args.silent = true;
-    args.dryRun = true;
-    args.skip = {};
-    args.skip.changelog = true;
-
-    if (config.prerelease) {
-      let prerelease = config.prerelease;
-      if (config.prerelease.includes('%r')) {
-        const r = currentBranch.substr(configName.split('*')[0].length);
-        prerelease = prerelease.replace(/%r/g, r);
-      }
-      if (config.prerelease.includes('%h')) {
-        const h = execSync('git log --format="%H" -n 1')
-          .toString()
-          .substr(0, 7);
-        prerelease = prerelease.replace(/%h/g, h);
-      }
-      args.prerelease = prerelease;
-    }
-    // args.tagPrefix = 'v';
-    // args.releaseAs = '2.0.0';
-    // args.firstRelease = true;
-    let newVersion = await bump(args, currVersion);
-    if (args.prerelease && config.prerelease!.includes('%h')) {
-      const i = newVersion.lastIndexOf('.');
-      newVersion = newVersion.substr(0, i);
-    }
-    return {
-      title: `${
-        config.release ? chalk.red('release') : chalk.yellow('prerelease')
-      } (${newVersion})`,
-      value: newVersion
-    };
-
-    // if (config.release) {
-    //   // version = "1.0.1-rc.0"
-    //   //   args = {}
-    //   //   args.silent = true
-    //   //   args.dryRun = true
-    //   //   args.skip = {}
-    //   //   args.skip.changelog = true
-    //   //   args.releaseAs = '2.0.0'
-    //   //   // args.firstRelease = true
-    //   //   args.prerelease = 'alpha'
-    //   // bump();
-
-    //   const args: any = {};
-    //   args.silent = true;
-    //   args.dryRun = true;
-    //   args.skip = {};
-    //   args.skip.changelog = true;
-
-    //   args.tagPrefix = '';
-    //   args.releaseAs = '2.0.0';
-    //   // args.firstRelease = true
-    //   args.prerelease = 'alpha';
-    //   const newVersion = bump(args, currVersion);
-    //   return { title: `Release ${newVersion}`, value: newVersion };
-    // } else if (config.prerelease) {
-    //   return {
-    //     title: 'Prerelease v1.1.0-alpha.0',
-    //     value: 'v1.1.0-alpha.0'
-    //   };
-    // } else {
-    //   return {
-    //     title: 'Prerelease none',
-    //     value: 'none'
-    //   };
-    // }
-  };
-  const getChoices = async (
-    config: iConfig[] | iConfig,
-    configName: string
-  ) => {
-    const choices = [];
-    if (Array.isArray(config)) {
-      await forEachSeries(config, async (value) => {
-        choices.push(await createChoice(value, configName));
-      });
-    } else {
-      choices.push(await createChoice(config, configName));
-    }
-    choices.push({ title: 'Other (specify)', value: 'specify' });
-    return choices;
-  };
-
-  if (configName === undefined) {
-    questions.push(PROMPT_SPECIFY);
-  } else if (typeof branchConfig[configName] === 'string') {
-    throw new TypeError(`failed: ${branchConfig[configName]}`);
-  } else {
-    questions.push(
-      {
-        type: 'select',
-        name: 'version',
-        message: 'Select or specify new version',
-        choices: await getChoices(branchConfig[configName] as any, configName),
-        initial: 0
-      },
-      PROMPT_SPECIFY
-    );
-  }
-
-  questions.push(PROMPT_COMMIT, PROMPT_PUSH);
-  // const response = await prompts(questions);
-
-  // execSync(
-  //   `npx release-it --increment ${response.version} --github.release --npm.tag=rc --preRelease --no-git.requireCleanWorkingDir`,
-  //   {
-  //     stdio: 'inherit'
+  // const createChoice = async (config: iConfig, configName: string) => {
+  //   if (config.release !== true && typeof config.prerelease !== 'string') {
+  //     throw new Error('The release policy of the branch is incorrect.');
   //   }
-  // );
 
-  // const oo: () => any = Version.prototype.incrementVersion;
-  // Version.prototype.incrementVersion = function(options) {
-  //   // this.setContext({ preReleaseId: 'beta' });
-  //   this.global.preReleaseId = 'beta';
-  //   return oo.call(this, options);
+  //   const args: any = {};
+  //   args.silent = true;
+  //   args.dryRun = true;
+  //   args.skip = {};
+  // args.skip.changelog = true;
+
+  // if (config.prerelease) {
+  //   let prerelease = config.prerelease;
+  //   if (config.prerelease.includes('%r')) {
+  //     const r = currentBranch.substr(configName.split('*')[0].length);
+  //     prerelease = prerelease.replace(/%r/g, r);
+  //   }
+  //   if (config.prerelease.includes('%h')) {
+  //     const h = execSync('git log --format="%H" -n 1')
+  //       .toString()
+  //       .substr(0, 7);
+  //     prerelease = prerelease.replace(/%h/g, h);
+  //   }
+  //   args.prerelease = prerelease;
+  // }
+  // args.tagPrefix = 'v';
+  // args.releaseAs = '2.0.0';
+  // args.firstRelease = true;
+  // let newVersion = await bump(args, currVersion);
+  // if (args.prerelease && config.prerelease!.includes('%h')) {
+  //   const i = newVersion.lastIndexOf('.');
+  //   newVersion = newVersion.substr(0, i);
+  // }
+  // return {
+  //   title: `${
+  //     config.release ? chalk.red('release') : chalk.yellow('prerelease')
+  //   } (${newVersion})`,
+  //   value: newVersion
   // };
 
-  // Git.prototype.release = async function() {
-  //   const { commit, tag, push } = this.options;
-  //   console.log(this.options);
-  //   await this.step({
-  //     enabled: commit,
-  //     task: () => this.commit(),
-  //     label: 'Git commit',
-  //     prompt: 'commit'
-  //   });
-  //   await this.step({
-  //     enabled: tag,
-  //     task: () => this.tag(),
-  //     label: 'Git tag',
-  //     prompt: 'tag'
-  //   });
-  //   await this.step({
-  //     enabled: push,
-  //     task: () => this.push(),
-  //     label: 'Git push',
-  //     prompt: 'push'
-  //   });
+  // if (config.release) {
+  //   // version = "1.0.1-rc.0"
+  //   //   args = {}
+  //   //   args.silent = true
+  //   //   args.dryRun = true
+  //   //   args.skip = {}
+  //   //   args.skip.changelog = true
+  //   //   args.releaseAs = '2.0.0'
+  //   //   // args.firstRelease = true
+  //   //   args.prerelease = 'alpha'
+  //   // bump();
+
+  //   const args: any = {};
+  //   args.silent = true;
+  //   args.dryRun = true;
+  //   args.skip = {};
+  //   args.skip.changelog = true;
+
+  //   args.tagPrefix = '';
+  //   args.releaseAs = '2.0.0';
+  //   // args.firstRelease = true
+  //   args.prerelease = 'alpha';
+  //   const newVersion = bump(args, currVersion);
+  //   return { title: `Release ${newVersion}`, value: newVersion };
+  // } else if (config.prerelease) {
+  //   return {
+  //     title: 'Prerelease v1.1.0-alpha.0',
+  //     value: 'v1.1.0-alpha.0'
+  //   };
+  // } else {
+  //   return {
+  //     title: 'Prerelease none',
+  //     value: 'none'
+  //   };
+  // }
+  // };
+  // const getChoices = async (
+  //   config: iConfig[] | iConfig,
+  //   configName: string
+  // ) => {
+  //   const choices = [];
+  //   if (Array.isArray(config)) {
+  //     await forEachSeries(config, async (value) => {
+  //       choices.push(await createChoice(value, configName));
+  //     });
+  //   } else {
+  //     choices.push(await createChoice(config, configName));
+  //   }
+  //   choices.push({ title: 'Other (specify)', value: 'specify' });
+  //   return choices;
   // };
 
-  // console.log(execSync(`npm view gfrp dist-tags --json`).toString());
-
-  // npm.prototype.getRegistryPreReleaseTags = function() {
-  //   return this.exec(`npm view ${this.getName()} dist-tags --json`, {
-  //     options
-  //   }).then(
-  //     (output) => {
-  //       try {
-  //         const tags = JSON.parse(output);
-  //         return Object.keys(tags).filter((tag) => tag !== DEFAULT_TAG);
-  //       } catch (err) {
-  //         this.debug(err);
-  //         return [];
-  //       }
+  // if (configName === undefined) {
+  //   questions.push(PROMPT_SPECIFY);
+  // } else if (typeof branchConfig[configName] === 'string') {
+  //   throw new TypeError(`failed: ${branchConfig[configName]}`);
+  // } else {
+  //   questions.push(
+  //     {
+  //       type: 'select',
+  //       name: 'version',
+  //       message: 'Select or specify new version',
+  //       choices: await getChoices(branchConfig[configName] as any, configName),
+  //       initial: 0
   //     },
-  //     () => []
+  //     PROMPT_SPECIFY
   //   );
-  // };
+  // }
+
+  // questions.push(PROMPT_COMMIT, PROMPT_PUSH);
+  // // const response = await prompts(questions);
+
+  // // execSync(
+  // //   `npx release-it --increment ${response.version} --github.release --npm.tag=rc --preRelease --no-git.requireCleanWorkingDir`,
+  // //   {
+  // //     stdio: 'inherit'
+  // //   }
+  // // );
+
+  // // const oo: () => any = Version.prototype.incrementVersion;
+  // // Version.prototype.incrementVersion = function(options) {
+  // //   // this.setContext({ preReleaseId: 'beta' });
+  // //   this.global.preReleaseId = 'beta';
+  // //   return oo.call(this, options);
+  // // };
+
+  // // Git.prototype.release = async function() {
+  // //   const { commit, tag, push } = this.options;
+  // //   console.log(this.options);
+  // //   await this.step({
+  // //     enabled: commit,
+  // //     task: () => this.commit(),
+  // //     label: 'Git commit',
+  // //     prompt: 'commit'
+  // //   });
+  // //   await this.step({
+  // //     enabled: tag,
+  // //     task: () => this.tag(),
+  // //     label: 'Git tag',
+  // //     prompt: 'tag'
+  // //   });
+  // //   await this.step({
+  // //     enabled: push,
+  // //     task: () => this.push(),
+  // //     label: 'Git push',
+  // //     prompt: 'push'
+  // //   });
+  // // };
+
+  // // console.log(execSync(`npm view gfrp dist-tags --json`).toString());
+
+  // // npm.prototype.getRegistryPreReleaseTags = function() {
+  // //   return this.exec(`npm view ${this.getName()} dist-tags --json`, {
+  // //     options
+  // //   }).then(
+  // //     (output) => {
+  // //       try {
+  // //         const tags = JSON.parse(output);
+  // //         return Object.keys(tags).filter((tag) => tag !== DEFAULT_TAG);
+  // //       } catch (err) {
+  // //         this.debug(err);
+  // //         return [];
+  // //       }
+  // //     },
+  // //     () => []
+  // //   );
+  // // };
 
   await runTasks({
     // increment: response.version,
@@ -323,7 +323,7 @@ dotenv.config();
     // preRelease: true,
     // preReleaseId: 'rc',
     dryRun: false,
-    verbose: 0,
+    verbose: 1,
     git: { requireCleanWorkingDir: false },
     plugins: {
       [path.resolve('./bin/gitflow')]: {
@@ -338,8 +338,8 @@ dotenv.config();
             prerelease: [
               'alpha',
               '%r',
-              { name: 'alpha2', npmTags: ['alpha', 'next'] },
-              { name: 'alpha3', finArgs: 'rFkDS' }
+              { name: 'experimental-%h', npmTags: ['alpha', 'next'] },
+              { name: 'experimental-%h', finArgs: 'rFkDS' }
             ],
             finArgs: 'rFkDS',
             npmTags: ['alpha', 'next']
