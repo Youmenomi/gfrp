@@ -47,9 +47,10 @@ type iConfig = {
     | (string | iPrereleaseWithiOpts)[];
 } & iOpts;
 
-type gfDefault = Omit<iGFConfig, 'versiontag'>;
+type iGitFlowBranches = Omit<iGFConfig, 'versiontag'>;
+type iGitFlowCurrent = keyof iGitFlowBranches;
 
-type iSelectActioin = [keyof gfDefault, 'start' | 'finish'];
+type iSelectActioin = [iGitFlowCurrent, 'start' | 'finish'];
 
 const gfWorkflow = [
   'master',
@@ -266,7 +267,7 @@ export default class GitFlow extends Plugin {
         ...GIT_CONFIG['gitflow "prefix"']
       };
 
-      let gfCurrent;
+      let gfCurrent: iGitFlowCurrent | undefined;
       gfWorkflow.some((name) => {
         if (gitCurrentBranch.indexOf(gfConfig[name]) === 0) {
           gfCurrent = name;
@@ -560,8 +561,32 @@ export default class GitFlow extends Plugin {
   }
 
   async getReleaseChoices() {
-    const { matchPolicies }: { matchPolicies: iConfig } = this.getContext();
+    const {
+      matchPolicies,
+      gfCurrent
+    }: {
+      matchPolicies: iConfig;
+      gfCurrent: iGitFlowCurrent;
+    } = this.getContext();
+
     const choices: { name: string; value: any }[] = [];
+
+    switch (gfCurrent) {
+      case 'master':
+        break;
+      case 'develop':
+        break;
+      case 'feature':
+        choices.push({ name: 'finish current', value: {} });
+        choices.push({ name: 'Other Action...', value: {} });
+        break;
+      case 'hotfix':
+        break;
+      case 'release':
+        break;
+      case 'support':
+        break;
+    }
 
     // if (matchPolicies.release) {
     //   choices.push(await this.createChoice(matchPolicies.release));
@@ -617,13 +642,11 @@ export default class GitFlow extends Plugin {
     const {
       gitCurrentBranch,
       latestVersion,
-      matchPrefix,
-      gfCurrent
+      matchPrefix
     }: {
       gitCurrentBranch: string;
       latestVersion: string;
       matchPrefix: string;
-      gfCurrent: gfDefault;
     } = this.getContext();
 
     // this.standardVersionBump('1.1.1.1');

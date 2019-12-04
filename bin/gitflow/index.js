@@ -19534,11 +19534,32 @@ class GitFlow extends Plugin {
 
   async getReleaseChoices() {
     const {
-      matchPolicies
+      matchPolicies,
+      gfCurrent
     } = this.getContext();
-    const choices = []; // if (matchPolicies.release) {
+    const choices = [];
+
+    switch (gfCurrent) {
+      case 'master':
+        break;
+
+      case 'develop':
+        break;
+
+      case 'feature':
+        choices.push({
+          name: 'finish current',
+          value: {}
+        });
+        choices.push({
+          name: 'Other Action...',
+          value: {}
+        });
+        break;
+    } // if (matchPolicies.release) {
     //   choices.push(await this.createChoice(matchPolicies.release));
     // }
+
 
     if (matchPolicies.prerelease) {
       const policies = Array.isArray(matchPolicies.prerelease) ? matchPolicies.prerelease : [matchPolicies.prerelease];
@@ -19582,8 +19603,7 @@ class GitFlow extends Plugin {
     const {
       gitCurrentBranch,
       latestVersion,
-      matchPrefix,
-      gfCurrent
+      matchPrefix
     } = this.getContext(); // this.standardVersionBump('1.1.1.1');
 
     let prerelease; // if (prereleaseFormula) {

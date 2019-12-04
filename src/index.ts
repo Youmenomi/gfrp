@@ -327,7 +327,7 @@ dotenv.config();
     git: { requireCleanWorkingDir: false },
     plugins: {
       [path.resolve('./bin/gitflow')]: {
-        gitlow: true,
+        gitflow: true,
         policyset: {
           master: 'You should not release directly on the master branch.',
           develop: {
