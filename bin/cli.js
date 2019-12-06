@@ -6193,15 +6193,60 @@ main$2.config();
     // preRelease: true,
     // preReleaseId: 'rc',
     dryRun: false,
-    verbose: 1,
+    verbose: 0,
     git: {
       requireCleanWorkingDir: false
     },
     plugins: {
       [path.resolve('./bin/gitflow')]: {
         gitflow: true,
+        supports: [{
+          master: 'support/1.x',
+          develop: 'develop-1.x',
+          feature: 'feature/',
+          hotfix: 'hotfix/',
+          release: 'release/',
+          support: 'support/',
+          versiontag: ''
+        }],
+        commandArgs: {
+          featureStart: {
+            F: false
+          },
+          featureFinish: {
+            F: false,
+            r: false,
+            k: false
+          },
+          releaseStart: {
+            F: false
+          },
+          releaseFinish: {
+            F: false,
+            s: false,
+            u: '',
+            m: '',
+            p: false,
+            k: false,
+            n: false
+          },
+          hotfixStart: {
+            F: false
+          },
+          hotfixFinish: {
+            F: false,
+            s: false,
+            u: '',
+            m: '',
+            p: false,
+            k: false,
+            n: false
+          },
+          supportStart: {
+            F: false
+          }
+        },
         policyset: {
-          master: 'You should not release directly on the master branch.',
           develop: {
             prerelease: [{
               name: 'alpha',
@@ -6209,23 +6254,20 @@ main$2.config();
             }, '%h']
           },
           'feature/*': {
-            release: true,
-            prerelease: ['alpha', '%r', {
+            prerelease: ['%r', {
               name: 'experimental-%h',
               npmTags: ['alpha', 'next']
             }, {
               name: 'experimental-%h',
-              finArgs: 'rFkDS'
+              finishArgs: 'rFk'
             }],
-            finArgs: 'rFkDS',
+            finishArgs: 'rFk',
             npmTags: ['alpha', 'next']
           },
           'release/*': {
-            release: true,
             prerelease: ['beta', 'rc']
           },
           'hotfix/*': {
-            release: true,
             prerelease: ['beta', 'rc']
           }
         }

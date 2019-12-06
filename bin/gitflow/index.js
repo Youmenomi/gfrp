@@ -19263,48 +19263,17 @@ class GitFlow extends Plugin {
       this.setContext({
         gfConfig,
         gfCurrent
-      }); // Object.keys(gfConfig).some((key) => {
-      //   gfConfig[key]
-      // });
-      // gfConfig.
-      // gfWorkflow
-      // if(position)
-      // position
-      // GIT_CONFIG[`[gitflow "branch.${gitCurrentBranch}"]`].base
-      // [gitflow "branch.feature/dotest"]
-      // // gfConfig.master ===
-      // switch (gitCurrentBranch) {
-      // }
-    } // 'feature/*': {
-    //   release: true,
-    //   prerelease: [
-    //     'alpha',
-    //     '%r',
-    //     { name: 'alpha2', npmTags: ['alpha', 'next'] },
-    //     { name: 'alpha3', finArgs: 'rFkDS' }
-    //   ],
-    //   finArgs: 'rFkDS',
-    //   npmTags: ['alpha', 'next']
-    // }
+      });
+    }
 
-
-    let matchPrefix;
-    let matchPolicies;
-    Object.keys(policyset).some(prefix => {
-      if (matcher.isMatch(gitCurrentBranch, prefix)) {
-        matchPrefix = prefix;
-        matchPolicies = policyset[prefix];
-        return true;
-      }
-
-      return false;
-    });
+    const {
+      matchPrefix,
+      matchPolicies
+    } = this.getMatchPrefixAndPolicies(gitCurrentBranch);
 
     if (!matchPolicies) {
       this.log.warn('No corresponding release policy found.');
       return null;
-    } else if (typeof matchPolicies === 'string') {
-      throw new TypeError(`failed: ${matchPolicies}`);
     }
 
     this.setContext({
@@ -19418,11 +19387,32 @@ class GitFlow extends Plugin {
     //   }
   }
 
+  getMatchPrefixAndPolicies(branch) {
+    const {
+      policyset
+    } = this.options;
+    let matchPrefix;
+    let matchPolicies;
+    Object.keys(policyset).some(prefix => {
+      if (matcher.isMatch(branch, prefix)) {
+        matchPrefix = prefix;
+        matchPolicies = policyset[prefix];
+        return true;
+      }
+
+      return false;
+    });
+    return matchPrefix && matchPolicies ? {
+      matchPrefix,
+      matchPolicies
+    } : null;
+  }
+
   async gfSelectAction() {
     this.registerPrompts({
       gfSelectAction: {
         type: 'list',
-        message: () => 'Recommended actions:',
+        message: () => 'Select one:',
         choices: () => [{
           name: 'Start a New Feature',
           value: ['feature', 'start']
@@ -19439,7 +19429,7 @@ class GitFlow extends Plugin {
       },
       gfSelectOther: {
         type: 'list',
-        message: () => 'Recommended actions:',
+        message: () => 'Select one:',
         choices: () => [{
           name: 'Finish Feature',
           value: ['feature', 'finish']
@@ -19503,39 +19493,90 @@ class GitFlow extends Plugin {
     this.setContext({
       latestVersion: options.latestVersion
     });
-    const choices = await this.getReleaseChoices();
-    console.log('choices:', choices); // const { gfConfig }: { gfConfig: iGFConfig } = this.getContext();
-    // if (gfConfig) {
-    //   if (gfConfig.master === gitCurrentBranch) {
-    //     // choices.push
-    //   }
-    // } else {
-    // }
-    // const choices = [];
-    // choices;
-    // this.registerPrompts({
-    //   gfrpSelect: {
-    //     type: 'list',
-    //     message: () => 'Select one:',
-    //     choices: () => {
-    //       return [];
-    //     }
-    //   }
-    // });
-
     this.registerPrompts((await this.createPrompts()));
-    const policy = await this.promptReleaseVersion();
-    this.setContext({
-      policy
-    });
-    console.log('policy:', policy);
-    return policy.newVersion;
+    const mainResult = await this.asyncPromptStep({
+      prompt: 'main'
+    }); // console.log('mainResult:', mainResult);
+
+    let newVersion;
+    let result;
+
+    switch (mainResult.type) {
+      case 'develop':
+        this.registerPrompts({
+          releaseList: {
+            type: 'list',
+            message: () => 'Specify a new version:',
+            choices: this.createChoices((await this.getReleaseChoices(mainResult.matchPolicies))),
+            pageSize: 9
+          }
+        });
+        result = await this.promptReleaseVersion();
+        this.setContext({
+          policy: result.policy
+        });
+        newVersion = result.newVersion;
+        break;
+
+      case 'current':
+        result = await this.promptReleaseVersion();
+        this.setContext({
+          policy: result.policy
+        });
+        newVersion = result.newVersion;
+        break;
+
+      case 'other':
+        this.execGitFlowAction((await this.gfSelectAction()));
+        newVersion = '1.2.3';
+        break;
+
+      default:
+        newVersion = '1.2.3';
+        break;
+    } // console.log('newVersion:', newVersion);
+    // process.exit();
+    // if (Array.isArray(next)) {
+    //   this.execGitFlowAction(next);
+    // } else if (next === 'release') {
+    //   const { newVersion, policy } = await this.promptReleaseVersion();
+    //   this.setContext({ policy });
+    //   return newVersion;
+    // } else {
+    //   this.execGitFlowAction(await this.gfSelectAction());
+    // }
+    // const { newVersion, policy } = await this.promptReleaseVersion();
+    // this.setContext({ policy });
+    // console.log('policy:', policy);
+
+
+    return newVersion;
   }
 
-  async getReleaseChoices() {
+  convertfinArgs(finArgs) {
+    return ' -' + finArgs.split('').join(' -');
+  }
+
+  execGitFlowAction(actoin) {
     const {
-      matchPolicies,
-      gfCurrent
+      matchPolicies
+    } = this.getContext();
+    const startOrFinish = actoin[1];
+    this.options;
+    child_process.execSync(`git flow ${actoin[0]} ${startOrFinish}${startOrFinish === 'finish' && matchPolicies.finArgs ? this.convertfinArgs(matchPolicies.finArgs) : ''} ${actoin[2]}`, {
+      stdio: 'inherit'
+    });
+  }
+
+  getStartedName(branch, prefix) {
+    return branch.substr(prefix.length);
+  }
+
+  getMainChoices() {
+    const {
+      gitCurrentBranch,
+      gfCurrent,
+      gfConfig
     } = this.getContext();
     const choices = [];
 
@@ -19547,19 +19588,51 @@ class GitFlow extends Plugin {
         break;
 
       case 'feature':
+        let matchPrefixAndPolicies = this.getMatchPrefixAndPolicies(gfConfig.develop);
+
+        if (matchPrefixAndPolicies) {
+          choices.push({
+            name: `release on develop${gfConfig.develop === 'develop' ? '' : `(${gfConfig.develop})`} ${chalk.reset.dim('(bump, commit and finish current)')}`,
+            value: {
+              type: 'develop',
+              ...matchPrefixAndPolicies
+            } // value: [
+            //   'feature',
+            //   'finish',
+            //   this.getStartedName(gitCurrentBranch, gfConfig[gfCurrent])
+            // ]
+
+          });
+        }
+
+        matchPrefixAndPolicies = this.getMatchPrefixAndPolicies(gitCurrentBranch);
+
+        if (matchPrefixAndPolicies) {
+          choices.push({
+            name: `release on current(${gitCurrentBranch})`,
+            value: {
+              type: 'current',
+              ...matchPrefixAndPolicies
+            }
+          });
+        }
+
         choices.push({
-          name: 'finish current',
-          value: {}
-        });
-        choices.push({
-          name: 'Other Action...',
-          value: {}
+          name: 'Other (git-flow actions)',
+          value: {
+            type: 'other'
+          }
         });
         break;
-    } // if (matchPolicies.release) {
+    }
+
+    return choices;
+  }
+
+  async getReleaseChoices(matchPolicies) {
+    const choices = []; // if (matchPolicies.release) {
     //   choices.push(await this.createChoice(matchPolicies.release));
     // }
-
 
     if (matchPolicies.prerelease) {
       const policies = Array.isArray(matchPolicies.prerelease) ? matchPolicies.prerelease : [matchPolicies.prerelease];
@@ -19581,21 +19654,13 @@ class GitFlow extends Plugin {
     const {
       matchPolicies
     } = this.getContext();
-    const {
-      finArgs,
-      npmTags
-    } = policy;
     const newVersion = await this.getNewVersion(prerelease);
     return {
       name: newVersion,
-      value: lodash.defaults({
+      value: {
         newVersion,
-        finArgs,
-        npmTags
-      }, {
-        finArgs: matchPolicies.finArgs,
-        npmTags: matchPolicies.npmTags
-      })
+        policy
+      }
     };
   }
 
@@ -19983,13 +20048,25 @@ class GitFlow extends Plugin {
     };
   }
 
+  createChoices(choices) {
+    return () => choices;
+  }
+
   async createPrompts() {
-    const choices = await this.getReleaseChoices();
+    const {
+      matchPolicies
+    } = this.getContext();
     return {
+      main: {
+        type: 'list',
+        message: () => 'Choose what you want to do:',
+        choices: this.createChoices(this.getMainChoices()),
+        pageSize: 9
+      },
       releaseList: {
         type: 'list',
         message: () => 'Specify a new version:',
-        choices: () => choices,
+        choices: this.createChoices((await this.getReleaseChoices(matchPolicies))),
         pageSize: 9
       },
       version: {
@@ -20002,21 +20079,21 @@ class GitFlow extends Plugin {
   }
 
   async promptReleaseVersion() {
-    let policy;
+    let result;
     await this.step({
       prompt: 'releaseList',
-      task: r => policy = r
+      task: r => result = r
     });
-    if (policy) return policy;
+    if (result) return result;
     await this.step({
       prompt: 'version',
       task: newVersion => {
-        policy = {
+        result = {
           newVersion
         };
       }
     });
-    return policy;
+    return result;
   }
 
   promptGitFlowInit() {
