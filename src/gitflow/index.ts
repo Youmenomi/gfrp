@@ -13,13 +13,17 @@ import matcher from 'matcher';
 // } from 'conventional-recommended-bump';
 
 import _ from 'lodash';
+import defaultOptions from './default';
 const { EOL } = require('os');
 const { Plugin } = require('release-it');
-const npm = require('release-it/lib/plugin/npm/npm');
-const Git = require('release-it/lib/plugin/git/Git');
-const GitHub = require('release-it/lib/plugin/github/GitHub');
+
 const isCI = require('is-ci');
 const gitSemverTags = require('git-semver-tags');
+const Version = require('release-it/lib/plugin/version/Version');
+const Git = require('release-it/lib/plugin/git/Git');
+const GitLab = require('release-it/lib/plugin/gitlab/GitLab');
+const GitHub = require('release-it/lib/plugin/github/GitHub');
+const npm = require('release-it/lib/plugin/npm/npm');
 
 type iGitFlowConfig = {
   master: string;
@@ -49,7 +53,20 @@ type iMatchPolicies = {
 type iGitFlowBranches = Omit<iGitFlowConfig, 'versiontag'>;
 type iGitFlowCurrent = keyof iGitFlowBranches;
 
-type iGitFlowActioin = [iGitFlowCurrent, 'start' | 'finish', string];
+type iGitFlowStartOrFinish = 'start' | 'finish';
+type iGitFlowStartOrFinishName = string;
+type iGitFlowActioin = [
+  iGitFlowCurrent,
+  iGitFlowStartOrFinish,
+  iGitFlowStartOrFinishName
+];
+type iSelectActionResult = [iGitFlowCurrent, iGitFlowStartOrFinish];
+
+type iMainResult = {
+  type: 'develop' | 'current' | 'other';
+  matchPrefix: string;
+  matchPolicies: iMatchPolicies;
+};
 
 type iContext = {
   gfConfig: iGitFlowConfig;
@@ -58,6 +75,7 @@ type iContext = {
   matchPrefix: string;
   matchPolicies: iMatchPolicies;
   latestVersion: string;
+  mainResult: iMainResult;
 };
 
 type iOptions = {
@@ -112,6 +130,9 @@ const versionTransformer = (context) => (input) =>
       : red(input)
     : redBright(input);
 
+const defaultPluginClasses = [Version, Git, GitLab, GitHub, npm];
+const defaultPlugins: any[] = [];
+
 export default class GitFlow extends Plugin {
   constructor({
     namespace,
@@ -143,13 +164,16 @@ export default class GitFlow extends Plugin {
 
     this.hackGit();
 
-    const superInit = GitHub.prototype.init;
-    GitHub.prototype.init = async function() {
-      await superInit.call(this);
-      this.options = Object.freeze(
-        this.getInitialOptions(this.config.getContext(), 'github')
-      );
-    };
+    defaultPluginClasses.forEach((pluginClass) => {
+      const superInit = pluginClass.prototype.init;
+      pluginClass.prototype.init = async function() {
+        await superInit.call(this);
+        this.options = Object.freeze(
+          this.getInitialOptions(this.config.getContext(), 'github')
+        );
+        defaultPlugins.push(this);
+      };
+    });
   }
 
   hackGit() {
@@ -399,22 +423,103 @@ export default class GitFlow extends Plugin {
       }
     });
 
-    let result = await this.asyncPromptStep({
+    let result = await this.asyncPromptStep<iSelectActionResult | null>({
       prompt: 'gfSelectAction'
     });
     if (!result) {
       this.deleteCurrentLine();
-      result = await this.asyncPromptStep({
+      result = await this.asyncPromptStep<iSelectActionResult | null>({
         prompt: 'gfSelectOther'
       });
     }
 
     if (!result) {
       this.deleteCurrentLine();
-      result = await this.gfSelectAction();
+      result = (await this.gfSelectAction()) as iSelectActionResult;
     }
 
-    return result as iGitFlowActioin;
+    return result as iSelectActionResult;
+  }
+
+  async gfEnterStartOrFinishName(rr: iSelectActionResult) {
+    this.registerPrompts({
+      enterStartOrFinishName: {
+        type: 'input',
+        message: () => `${rr[0]} Name:`,
+        transformer: (context) => (input) => {
+          return this.validateStartOrFinishName(input)
+            ? green(input)
+            : redBright(input);
+        },
+        validate: (input: string) =>
+          this.validateStartOrFinishName(input)
+            ? true
+            : `'${input}' is not a valid name`
+      }
+    });
+
+    return [
+      ...rr,
+      await this.asyncPromptStep<string>({
+        prompt: 'enterStartOrFinishName'
+      })
+    ] as iGitFlowActioin;
+  }
+
+  async gfSelectGitFlowCommandArgs(rr: iSelectActionResult) {
+    const a1 = execSync(`git flow ${rr[0]} ${rr[1]} -h`)
+      .toString()
+      // .split('flags:')[1]
+      .split('\n');
+
+    // a1.
+
+    this.registerPrompts({
+      selectGitFlowCommandArgs: {
+        type: 'checkbox',
+        message: () => 'Select options to finish feature:',
+        choices: () => [
+          {
+            name: '-r rebase instead of merge',
+            value: 'r'
+          },
+          {
+            name: '-F fetch from $ORIGIN before performing finish',
+            value: 'F'
+          },
+          {
+            name: '-k keep branch after performing finish',
+            value: 'k'
+          },
+          {
+            name: '-D force delete feature branch after finish',
+            value: 'D'
+          },
+          {
+            name: 'S squash feature during merge',
+            value: 'S'
+          }
+        ],
+        default: [],
+        pageSize: 9
+      }
+    });
+
+    return [
+      ...rr,
+      await this.asyncPromptStep<string>({
+        prompt: 'enterStartOrFinishName'
+      })
+    ] as iGitFlowActioin;
+  }
+
+  validateStartOrFinishName(name: string) {
+    try {
+      execSync(`git check-ref-format --branch "${name}"`, { stdio: 'ignore' });
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   gfSelectBranch(branches: string[]) {
@@ -446,16 +551,14 @@ export default class GitFlow extends Plugin {
     isPreRelease: boolean;
     preReleaseId: string;
   }) {
-    this.setContext({ latestVersion: options.latestVersion });
+    const latestVersion = options.latestVersion;
+    this.setContext({ latestVersion });
 
     this.registerPrompts(await this.createPrompts());
-    const mainResult = await this.asyncPromptStep<{
-      type: string;
-      matchPrefix: string;
-      matchPolicies: iMatchPolicies;
-    }>({
+    const mainResult = await this.asyncPromptStep<iMainResult>({
       prompt: 'main'
     });
+    this.setContext({ mainResult });
     // console.log('mainResult:', mainResult);
 
     let newVersion: string;
@@ -484,12 +587,11 @@ export default class GitFlow extends Plugin {
         newVersion = result.newVersion;
         break;
       case 'other':
-        this.execGitFlowAction(await this.gfSelectAction());
-        newVersion = '1.2.3';
-        break;
-      default:
-        newVersion = '1.2.3';
-        break;
+        this.execGitFlowAction(
+          await this.gfEnterStartOrFinishName(await this.gfSelectAction())
+        );
+        console.log(`🏁 Done (in ${Math.floor(process.uptime())}s.)`);
+        process.exit();
     }
 
     // console.log('newVersion:', newVersion);
@@ -508,11 +610,11 @@ export default class GitFlow extends Plugin {
     // const { newVersion, policy } = await this.promptReleaseVersion();
     // this.setContext({ policy });
     // console.log('policy:', policy);
-    return newVersion;
+    return newVersion!;
   }
 
   convertfinArgs(finArgs: string) {
-    return ' -' + finArgs.split('').join(' -');
+    return ' -' + [...finArgs].join(' -');
   }
   execGitFlowAction(actoin: iGitFlowActioin) {
     const { matchPolicies } = this.getContext() as iContext;
@@ -808,8 +910,20 @@ export default class GitFlow extends Plugin {
     const {
       gitCurrentBranch,
       matchPrefix,
-      matchPolicies
+      matchPolicies,
+      mainResult
     } = this.getContext() as iContext;
+
+    switch (mainResult.type) {
+      case 'current':
+        break;
+      case 'other':
+        defaultPlugins.forEach((plugin) => {
+          plugin.release = () => {};
+        });
+        return;
+        break;
+    }
 
     // const {
     //   tagDependsOnCommit = true
@@ -818,7 +932,7 @@ export default class GitFlow extends Plugin {
     Git.prototype.release = async function() {
       switch (gitCurrentBranch.split('/')[0]) {
         case 'feature':
-          this.commit();
+          // this.commit();
 
           const prompts = {
             finArgs: {

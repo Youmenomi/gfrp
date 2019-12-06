@@ -19156,20 +19156,26 @@ const {
   Plugin
 } = require('release-it');
 
-const npm = require('release-it/lib/plugin/npm/npm');
-
-const Git = require('release-it/lib/plugin/git/Git');
-
-const GitHub = require('release-it/lib/plugin/github/GitHub');
-
 const isCI = require('is-ci');
 
 const gitSemverTags = require('git-semver-tags');
+
+const Version = require('release-it/lib/plugin/version/Version');
+
+const Git = require('release-it/lib/plugin/git/Git');
+
+const GitLab = require('release-it/lib/plugin/gitlab/GitLab');
+
+const GitHub = require('release-it/lib/plugin/github/GitHub');
+
+const npm = require('release-it/lib/plugin/npm/npm');
 
 const gfWorkflow = ['master', 'develop', 'feature', 'release', 'hotfix', 'support'];
 
 const versionTransformer = context => input => semver.valid(input) ? semver.gt(input, context.latestVersion) ? chalk.green(input) : chalk.red(input) : chalk.redBright(input);
 
+const defaultPluginClasses = [Version, Git, GitLab, GitHub, npm];
+const defaultPlugins = [];
 class GitFlow extends Plugin {
   constructor({
     namespace,
@@ -19196,12 +19202,15 @@ class GitFlow extends Plugin {
       ci: isCI || undefined
     }, this.config.localConfig, overwriteDefaultConfig, this.config.defaultConfig);
     this.hackGit();
-    const superInit = GitHub.prototype.init;
+    defaultPluginClasses.forEach(pluginClass => {
+      const superInit = pluginClass.prototype.init;
 
-    GitHub.prototype.init = async function () {
-      await superInit.call(this);
-      this.options = Object.freeze(this.getInitialOptions(this.config.getContext(), 'github'));
-    };
+      pluginClass.prototype.init = async function () {
+        await superInit.call(this);
+        this.options = Object.freeze(this.getInitialOptions(this.config.getContext(), 'github'));
+        defaultPlugins.push(this);
+      };
+    });
   }
 
   hackGit() {
@@ -19464,6 +19473,33 @@ class GitFlow extends Plugin {
     return result;
   }
 
+  async gfEnterStartOrFinishName(rr) {
+    this.registerPrompts({
+      enterStartOrFinishName: {
+        type: 'input',
+        message: () => `${rr[0]} Name:`,
+        transformer: context => input => {
+          return this.validateStartOrFinishName(input) ? chalk.green(input) : chalk.redBright(input);
+        },
+        validate: input => this.validateStartOrFinishName(input) ? true : `${input}' is not a valid name`
+      }
+    });
+    return [...rr, await this.asyncPromptStep({
+      prompt: 'enterStartOrFinishName'
+    })];
+  }
+
+  validateStartOrFinishName(name) {
+    try {
+      child_process.execSync(`git check-ref-format --branch "${name}"`, {
+        stdio: 'ignore'
+      });
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   gfSelectBranch(branches) {
     this.registerPrompts({
       gfSelectBranch: {
@@ -19490,12 +19526,16 @@ class GitFlow extends Plugin {
   }
 
   async getIncrementedVersion(options) {
+    const latestVersion = options.latestVersion;
     this.setContext({
-      latestVersion: options.latestVersion
+      latestVersion
     });
     this.registerPrompts((await this.createPrompts()));
     const mainResult = await this.asyncPromptStep({
       prompt: 'main'
+    });
+    this.setContext({
+      mainResult
     }); // console.log('mainResult:', mainResult);
 
     let newVersion;
@@ -19527,13 +19567,9 @@ class GitFlow extends Plugin {
         break;
 
       case 'other':
-        this.execGitFlowAction((await this.gfSelectAction()));
-        newVersion = '1.2.3';
-        break;
-
-      default:
-        newVersion = '1.2.3';
-        break;
+        this.execGitFlowAction((await this.gfEnterStartOrFinishName((await this.gfSelectAction()))));
+        console.log(`🏁 Done (in ${Math.floor(process.uptime())}s.)`);
+        process.exit();
     } // console.log('newVersion:', newVersion);
     // process.exit();
     // if (Array.isArray(next)) {
@@ -19554,7 +19590,7 @@ class GitFlow extends Plugin {
   }
 
   convertfinArgs(finArgs) {
-    return ' -' + finArgs.split('').join(' -');
+    return ' -' + [...finArgs].join(' -');
   }
 
   execGitFlowAction(actoin) {
@@ -19829,16 +19865,29 @@ class GitFlow extends Plugin {
     const {
       gitCurrentBranch,
       matchPrefix,
-      matchPolicies
-    } = this.getContext(); // const {
+      matchPolicies,
+      mainResult
+    } = this.getContext();
+
+    switch (mainResult.type) {
+      case 'current':
+        break;
+
+      case 'other':
+        defaultPlugins.forEach(plugin => {
+          plugin.release = () => {};
+        });
+        return;
+    } // const {
     //   tagDependsOnCommit = true
     // releaseDependsOnPush = true
     // } = this.options;
 
+
     Git.prototype.release = async function () {
       switch (gitCurrentBranch.split('/')[0]) {
         case 'feature':
-          this.commit();
+          // this.commit();
           const prompts = {
             finArgs: {
               type: 'checkbox',
