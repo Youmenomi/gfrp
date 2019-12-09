@@ -13,7 +13,9 @@ import matcher from 'matcher';
 // } from 'conventional-recommended-bump';
 
 import _ from 'lodash';
+import crab from '../utils/crab';
 import defaultOptions from './default';
+
 const { EOL } = require('os');
 const { Plugin } = require('release-it');
 
@@ -467,43 +469,50 @@ export default class GitFlow extends Plugin {
   }
 
   async gfSelectGitFlowCommandArgs(rr: iSelectActionResult) {
-    const a1 = execSync(`git flow ${rr[0]} ${rr[1]} -h`)
-      .toString()
-      // .split('flags:')[1]
-      .split('\n');
+    // const a1 = execSync(`git flow ${rr[0]} ${rr[1]} -h`)
+    //   .toString()
+    const names = crab(
+      execSync(`git flow ${rr[0]} ${rr[1]} -h`).toString(),
+      '\n  '
+    );
+    names.shift();
+    const values = names.map((name: string) => {
+      const r = name.split(' ')[0];
+      return r === 'true' ? true : r === 'false' ? false : r;
+    });
 
-    // a1.
+    const choices: { name: string; value: any }[] = [];
+    names.forEach((name, i) => {
+      choices.push({ name, value: values[i] });
+    });
+
+    // Object.keys(
+    //   defaultOptions.commandArgs[
+    //     rr[0] as 'feature' | 'hotfix' | 'release' | 'support'
+    //   ][rr[1] as 'start' | 'finish']
+    // ).forEach((v)=>{
+    //   // v.
+    //   choices.push({name: string; value: any});
+    // })
+
+    // rr[0]} ${rr[1]
 
     this.registerPrompts({
       selectGitFlowCommandArgs: {
         type: 'checkbox',
         message: () => 'Select options to finish feature:',
-        choices: () => [
-          {
-            name: '-r rebase instead of merge',
-            value: 'r'
-          },
-          {
-            name: '-F fetch from $ORIGIN before performing finish',
-            value: 'F'
-          },
-          {
-            name: '-k keep branch after performing finish',
-            value: 'k'
-          },
-          {
-            name: '-D force delete feature branch after finish',
-            value: 'D'
-          },
-          {
-            name: 'S squash feature during merge',
-            value: 'S'
-          }
-        ],
+        choices,
         default: [],
         pageSize: 9
       }
     });
+
+    console.log(
+      await this.asyncPromptStep<string>({
+        prompt: 'enterStartOrFinishName'
+      })
+    );
+    process.exit();
 
     return [
       ...rr,

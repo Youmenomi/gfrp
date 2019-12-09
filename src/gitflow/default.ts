@@ -12,33 +12,42 @@ export default {
     }
   ],
   commandArgs: {
-    featureStart: { F: false },
-    featureFinish: {
-      F: false,
-      r: false,
-      k: false
+    feature: {
+      start: { F: false },
+      finish: {
+        F: false,
+        r: false,
+        k: false
+      }
     },
-    releaseStart: { F: false },
-    releaseFinish: {
-      F: false,
-      s: false,
-      u: '',
-      m: '',
-      p: false,
-      k: false,
-      n: false
+    release: {
+      start: { F: false },
+      finish: {
+        F: false,
+        s: false,
+        u: '',
+        m: '',
+        p: false,
+        k: false,
+        n: false
+      }
     },
-    hotfixStart: { F: false },
-    hotfixFinish: {
-      F: false,
-      s: false,
-      u: '',
-      m: '',
-      p: false,
-      k: false,
-      n: false
+    hotfix: {
+      start: { F: false },
+      finish: {
+        F: false,
+        s: false,
+        u: '',
+        m: '',
+        p: false,
+        k: false,
+        n: false
+      }
     },
-    supportStart: { F: false }
+    support: {
+      start: { F: false },
+      finish: {}
+    }
   },
   policyset: {
     develop: {

@@ -19148,6 +19148,26 @@ var lodash = createCommonjsModule(function (module, exports) {
 }.call(commonjsGlobal));
 });
 
+function crab(text, arg1, arg2) {
+  let r;
+  const j = text.split(arg1);
+  j.shift();
+
+  if (arg2) {
+    r = [];
+    j.forEach(v => {
+      if (v.includes(arg2)) {
+        const k = v.split(arg2);
+        r.push(k[0]);
+      }
+    });
+  } else {
+    r = j;
+  }
+
+  return r;
+}
+
 const {
   EOL
 } = require('os');
@@ -19481,9 +19501,52 @@ class GitFlow extends Plugin {
         transformer: context => input => {
           return this.validateStartOrFinishName(input) ? chalk.green(input) : chalk.redBright(input);
         },
-        validate: input => this.validateStartOrFinishName(input) ? true : `${input}' is not a valid name`
+        validate: input => this.validateStartOrFinishName(input) ? true : `'${input}' is not a valid name`
       }
     });
+    return [...rr, await this.asyncPromptStep({
+      prompt: 'enterStartOrFinishName'
+    })];
+  }
+
+  async gfSelectGitFlowCommandArgs(rr) {
+    // const a1 = execSync(`git flow ${rr[0]} ${rr[1]} -h`)
+    //   .toString()
+    const names = crab(child_process.execSync(`git flow ${rr[0]} ${rr[1]} -h`).toString(), '\n  ');
+    names.shift();
+    const values = names.map(name => {
+      const r = name.split(' ')[0];
+      return r === 'true' ? true : r === 'false' ? false : r;
+    });
+    const choices = [];
+    names.forEach((name, i) => {
+      choices.push({
+        name,
+        value: values[i]
+      });
+    }); // Object.keys(
+    //   defaultOptions.commandArgs[
+    //     rr[0] as 'feature' | 'hotfix' | 'release' | 'support'
+    //   ][rr[1] as 'start' | 'finish']
+    // ).forEach((v)=>{
+    //   // v.
+    //   choices.push({name: string; value: any});
+    // })
+    // rr[0]} ${rr[1]
+
+    this.registerPrompts({
+      selectGitFlowCommandArgs: {
+        type: 'checkbox',
+        message: () => 'Select options to finish feature:',
+        choices,
+        default: [],
+        pageSize: 9
+      }
+    });
+    console.log((await this.asyncPromptStep({
+      prompt: 'enterStartOrFinishName'
+    })));
+    process.exit();
     return [...rr, await this.asyncPromptStep({
       prompt: 'enterStartOrFinishName'
     })];
