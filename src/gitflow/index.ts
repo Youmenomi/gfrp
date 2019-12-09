@@ -509,7 +509,7 @@ export default class GitFlow extends Plugin {
 
     console.log(
       await this.asyncPromptStep<string>({
-        prompt: 'enterStartOrFinishName'
+        prompt: 'selectGitFlowCommandArgs'
       })
     );
     process.exit();
@@ -517,7 +517,7 @@ export default class GitFlow extends Plugin {
     return [
       ...rr,
       await this.asyncPromptStep<string>({
-        prompt: 'enterStartOrFinishName'
+        prompt: 'selectGitFlowCommandArgs'
       })
     ] as iGitFlowActioin;
   }
@@ -597,7 +597,9 @@ export default class GitFlow extends Plugin {
         break;
       case 'other':
         this.execGitFlowAction(
-          await this.gfEnterStartOrFinishName(await this.gfSelectAction())
+          await this.gfSelectGitFlowCommandArgs(
+            await this.gfEnterStartOrFinishName(await this.gfSelectAction())
+          )
         );
         console.log(`🏁 Done (in ${Math.floor(process.uptime())}s.)`);
         process.exit();
