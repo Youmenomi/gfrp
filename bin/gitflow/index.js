@@ -19315,7 +19315,6 @@ class GitFlow extends Plugin {
 
     Git.prototype.init = async function () {
       this.options = Object.freeze(this.getInitialOptions(this.config.getContext(), 'git'));
-      console.log('XXX ', this);
       await superInit.call(this);
     };
   }
@@ -20058,37 +20057,69 @@ class GitFlow extends Plugin {
           plugin.release = () => {};
         });
         return;
-    } // const {
+    }
+
+    const {
+      execGitFlowAction,
+      gfSelectGitFlowCommandArgs,
+      gfEnterStartOrFinishName
+    } = this; // const {
     //   tagDependsOnCommit = true
     // releaseDependsOnPush = true
     // } = this.options;
-    // Git.prototype.release = async function() {
-    //   const { commit, tag, push } = this.options;
-    //   let isCommit = false;
-    //   await this.step({
-    //     enabled: commit,
-    //     task: () => {
-    //       isCommit = true;
-    //       this.commit();
-    //     },
-    //     label: 'Git commit',
-    //     prompt: 'commit'
-    //   });
-    //   if (tagDependsOnCommit && isCommit)
-    //     await this.step({
-    //       enabled: isCommit,
-    //       task: () => this.tag(),
-    //       label: 'Git tag',
-    //       prompt: 'tag'
-    //     });
-    //   await this.step({
-    //     enabled: push,
-    //     task: () => this.push(),
-    //     label: 'Git push',
-    //     prompt: 'push'
-    //   });
-    // };
 
+    Git.prototype.release = async function () {
+      const {
+        commit,
+        tag,
+        push
+      } = this.options;
+      await this.step({
+        enabled: commit,
+        task: () => {
+          this.commit();
+        },
+        label: 'Git commit',
+        prompt: 'commit'
+      });
+
+      switch (mainResult.type) {
+        case 'develop':
+          // if (isCommit) {
+          // } else {
+          // }
+          execGitFlowAction((await gfSelectGitFlowCommandArgs(['feature', 'finish', gitCurrentBranch.split('/')[1]])));
+          break;
+      }
+
+      await this.step({
+        enabled: push,
+        task: () => this.push(),
+        label: 'Git push',
+        prompt: 'push'
+      }); // await this.step({
+      //   enabled: commit,
+      //   task: () => {
+      //     isCommit = true;
+      //     this.commit();
+      //   },
+      //   label: 'Git commit',
+      //   prompt: 'commit'
+      // });
+      // if (tagDependsOnCommit && isCommit)
+      //   await this.step({
+      //     enabled: isCommit,
+      //     task: () => this.tag(),
+      //     label: 'Git tag',
+      //     prompt: 'tag'
+      //   });
+      // await this.step({
+      //   enabled: push,
+      //   task: () => this.push(),
+      //   label: 'Git push',
+      //   prompt: 'push'
+      // });
+    };
 
     const npmTags = this.getContext().policy.npmTags;
 
