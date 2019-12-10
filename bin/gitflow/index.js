@@ -20088,6 +20088,12 @@ class GitFlow extends Plugin {
       }
 
       await this.step({
+        enabled: tag,
+        task: () => this.tag(),
+        label: 'Git tag',
+        prompt: 'tag'
+      });
+      await this.step({
         enabled: push,
         task: () => this.push(),
         label: 'Git push',
