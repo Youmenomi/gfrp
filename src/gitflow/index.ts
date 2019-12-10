@@ -178,7 +178,7 @@ export default class GitFlow extends Plugin {
       pluginClass.prototype.init = async function() {
         await superInit.call(this);
         this.options = Object.freeze(
-          this.getInitialOptions(this.config.getContext(), 'github')
+          this.getInitialOptions(this.config.getContext(), this.namespace)
         );
         defaultPlugins.push(this);
       };
@@ -191,6 +191,7 @@ export default class GitFlow extends Plugin {
       this.options = Object.freeze(
         this.getInitialOptions(this.config.getContext(), 'git')
       );
+      console.log('XXX ', this);
       await superInit.call(this);
     };
   }

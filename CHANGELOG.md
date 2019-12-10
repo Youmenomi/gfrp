@@ -1,3 +1,23 @@
+## [1.4.1-dotest.13](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.13) (2019-12-10)
+
+## [1.4.1-dotest.12](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.12) (2019-12-10)
+
+## [1.4.1-dotest.11](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.11) (2019-12-10)
+
+## [1.4.1-dotest.10](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.10) (2019-12-10)
+
+## [1.4.1-dotest.9](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.9) (2019-12-10)
+
+## [1.4.1-dotest.8](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.8) (2019-12-10)
+
+## [1.4.1-dotest.7](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.7) (2019-12-10)
+
+## [1.4.1-dotest.6](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.6) (2019-12-10)
+
+## [1.4.1-dotest.5](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.5) (2019-12-10)
+
+## [1.4.1-dotest.4](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.4) (2019-12-10)
+
 ## [1.4.1-dotest.3](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.3) (2019-12-10)
 
 ## [1.4.1-dotest.2](https://github.com/Youmenomi/gfrp/compare/1.4.1-dotest.0...1.4.1-dotest.2) (2019-12-10)
