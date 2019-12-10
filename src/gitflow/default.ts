@@ -16,7 +16,7 @@ export default {
       start: { F: false },
       finish: {
         F: false,
-        r: false,
+        r: true,
         k: false
       }
     },
@@ -25,9 +25,9 @@ export default {
       finish: {
         F: false,
         s: false,
-        u: '',
+        u: '123',
         m: '',
-        p: false,
+        p: true,
         k: false,
         n: false
       }
@@ -45,8 +45,7 @@ export default {
       }
     },
     support: {
-      start: { F: false },
-      finish: {}
+      start: { F: false }
     }
   },
   policyset: {
@@ -69,4 +68,4 @@ export default {
       prerelease: ['beta', 'rc']
     }
   }
-};
+} as any;

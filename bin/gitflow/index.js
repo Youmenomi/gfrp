@@ -19148,25 +19148,102 @@ var lodash = createCommonjsModule(function (module, exports) {
 }.call(commonjsGlobal));
 });
 
-function crab(text, arg1, arg2) {
-  let r;
-  const j = text.split(arg1);
-  j.shift();
-
-  if (arg2) {
-    r = [];
-    j.forEach(v => {
-      if (v.includes(arg2)) {
-        const k = v.split(arg2);
-        r.push(k[0]);
-      }
-    });
-  } else {
-    r = j;
-  }
-
-  return r;
+function crab(text, arg1, arg2, start = 0, array = []) {
+  let l = -1;
+  let r = -1;
+  l = text.indexOf(arg1, start);
+  if (l < 0) return array;
+  start = l + arg1.length;
+  r = text.indexOf(arg2, start);
+  if (r < 0) return array;
+  array.push(text.substring(start, r));
+  start = r + arg2.length;
+  crab(text, arg1, arg2, start, array);
+  return array;
 }
+
+var ccc = {
+  gitflow: true,
+  supports: [{
+    master: 'support/1.x',
+    develop: 'develop-1.x',
+    feature: 'feature/',
+    hotfix: 'hotfix/',
+    release: 'release/',
+    support: 'support/',
+    versiontag: ''
+  }],
+  commandArgs: {
+    feature: {
+      start: {
+        F: false
+      },
+      finish: {
+        F: false,
+        r: true,
+        k: false
+      }
+    },
+    release: {
+      start: {
+        F: false
+      },
+      finish: {
+        F: false,
+        s: false,
+        u: '123',
+        m: '',
+        p: true,
+        k: false,
+        n: false
+      }
+    },
+    hotfix: {
+      start: {
+        F: false
+      },
+      finish: {
+        F: false,
+        s: false,
+        u: '',
+        m: '',
+        p: false,
+        k: false,
+        n: false
+      }
+    },
+    support: {
+      start: {
+        F: false
+      }
+    }
+  },
+  policyset: {
+    develop: {
+      prerelease: [{
+        name: 'alpha',
+        npmTags: ['alpha', 'next']
+      }, '%h']
+    },
+    'feature/*': {
+      prerelease: ['%r', {
+        name: 'experimental-%h',
+        npmTags: ['alpha', 'next']
+      }, {
+        name: 'experimental-%h',
+        finishArgs: 'rFk'
+      }],
+      finishArgs: 'rFk',
+      npmTags: ['alpha', 'next']
+    },
+    'release/*': {
+      prerelease: ['beta', 'rc']
+    },
+    'hotfix/*': {
+      prerelease: ['beta', 'rc']
+    }
+  }
+};
 
 const {
   EOL
@@ -19443,17 +19520,23 @@ class GitFlow extends Plugin {
         type: 'list',
         message: () => 'Select one:',
         choices: () => [{
-          name: 'Start a New Feature',
+          name: 'Start Feature',
           value: ['feature', 'start']
         }, {
-          name: 'Start a New Release',
+          name: 'Start Release',
           value: ['release', 'start']
         }, {
-          name: 'Start a New Hotfix',
+          name: 'Start Hotfix',
           value: ['hotfix', 'start']
         }, {
-          name: 'Other Action...',
-          value: null
+          name: 'Finish Feature',
+          value: ['feature', 'finish']
+        }, {
+          name: 'Finish Release',
+          value: ['release', 'finish']
+        }, {
+          name: 'Finish Hotfix',
+          value: ['hotfix', 'finish']
         }]
       },
       gfSelectOther: {
@@ -19493,63 +19576,106 @@ class GitFlow extends Plugin {
     return result;
   }
 
-  async gfEnterStartOrFinishName(rr) {
+  async gfEnterStartOrFinishName(result) {
     this.registerPrompts({
       enterStartOrFinishName: {
         type: 'input',
-        message: () => `${rr[0]} Name:`,
+        message: () => `${lodash.upperFirst(result[0])} Name:`,
         transformer: context => input => {
           return this.validateStartOrFinishName(input) ? chalk.green(input) : chalk.redBright(input);
         },
         validate: input => this.validateStartOrFinishName(input) ? true : `'${input}' is not a valid name`
       }
     });
-    return [...rr, await this.asyncPromptStep({
+    return [...result, await this.asyncPromptStep({
       prompt: 'enterStartOrFinishName'
     })];
   }
 
-  async gfSelectGitFlowCommandArgs(rr) {
-    // const a1 = execSync(`git flow ${rr[0]} ${rr[1]} -h`)
-    //   .toString()
-    const names = crab(child_process.execSync(`git flow ${rr[0]} ${rr[1]} -h`).toString(), '\n  ');
-    names.shift();
-    const values = names.map(name => {
-      const r = name.split(' ')[0];
-      return r === 'true' ? true : r === 'false' ? false : r;
-    });
-    const choices = [];
-    names.forEach((name, i) => {
-      choices.push({
-        name,
-        value: values[i]
-      });
-    }); // Object.keys(
-    //   defaultOptions.commandArgs[
-    //     rr[0] as 'feature' | 'hotfix' | 'release' | 'support'
-    //   ][rr[1] as 'start' | 'finish']
-    // ).forEach((v)=>{
-    //   // v.
-    //   choices.push({name: string; value: any});
-    // })
-    // rr[0]} ${rr[1]
+  async gfSelectGitFlowCommandArgs(result) {
+    let h;
 
+    try {
+      await this.exec(`git flow ${result[0]} ${result[1]} -h`, {
+        write: false
+      });
+    } catch (error) {
+      h = error.message;
+    }
+
+    const defaultOptions = {};
+    const names = crab(h, '  -', '\n');
+    names.shift();
+    const items = names.map(name => {
+      const propName = name.split('  ')[0];
+      const propStringValue = crab(name, 'default: ', ')')[0];
+      const propValue = propStringValue === 'true' ? true : propStringValue === 'false' ? false : propStringValue;
+      defaultOptions[propName] = propValue;
+      const t = name.split('  ');
+      return {
+        option: `-${t[0]}`,
+        description: t[1].split(' (')[0]
+      };
+    });
+
+    const opts = lodash.defaultsDeep(ccc.commandArgs[result[0]][result[1]], defaultOptions);
+
+    const values = [];
+    const choices = [];
+    Object.keys(defaultOptions).forEach((propName, i) => {
+      const propValue = opts[propName];
+
+      if (typeof propValue === 'string') {
+        values[i] = [propName, propValue];
+      } else if (typeof propValue === 'boolean') {
+        values[i] = [propName];
+      } else {
+        values[i] = [];
+      }
+
+      choices.push({
+        name: `${items[i].option} ${chalk.dim(items[i].description)}`,
+        value: {
+          index: i,
+          value: values[i],
+          ...items[i]
+        },
+        checked: Boolean(propValue)
+      });
+    });
     this.registerPrompts({
       selectGitFlowCommandArgs: {
         type: 'checkbox',
-        message: () => 'Select options to finish feature:',
-        choices,
-        default: [],
+        message: () => `Select options to ${result[1]} ${result[0]}:`,
+        choices: () => choices,
         pageSize: 9
       }
     });
-    console.log((await this.asyncPromptStep({
-      prompt: 'enterStartOrFinishName'
-    })));
-    process.exit();
-    return [...rr, await this.asyncPromptStep({
-      prompt: 'enterStartOrFinishName'
-    })];
+    const commandArgsResult = await this.asyncPromptStep({
+      prompt: 'selectGitFlowCommandArgs'
+    });
+    let commandArgs = '';
+    await pIteration.forEachSeries(commandArgsResult, async args => {
+      if (typeof args.value[1] === 'string') {
+        this.registerPrompts({
+          enterGitFlowCommandArgs: {
+            type: 'input',
+            message: () => `Enter to ${args.description}:`,
+            default: args.value[1] ? () => args.value[1] : undefined
+          }
+        });
+        args.value[1] = await this.asyncPromptStep({
+          prompt: 'enterGitFlowCommandArgs'
+        });
+
+        if (args.value[1]) {
+          commandArgs += ` -${args.value[0]} '${args.value[1]}'`;
+        }
+      } else {
+        commandArgs += ` -${args.value[0]}`;
+      }
+    });
+    return [...result, commandArgs];
   }
 
   validateStartOrFinishName(name) {
@@ -19567,7 +19693,7 @@ class GitFlow extends Plugin {
     this.registerPrompts({
       gfSelectBranch: {
         type: 'list',
-        message: () => 'Select one:',
+        message: () => 'Select One:',
         choices: () => {
           return branches.map(name => {
             return {
@@ -19630,7 +19756,7 @@ class GitFlow extends Plugin {
         break;
 
       case 'other':
-        this.execGitFlowAction((await this.gfEnterStartOrFinishName((await this.gfSelectAction()))));
+        this.execGitFlowAction((await this.gfSelectGitFlowCommandArgs((await this.gfEnterStartOrFinishName((await this.gfSelectAction()))))));
         console.log(`🏁 Done (in ${Math.floor(process.uptime())}s.)`);
         process.exit();
     } // console.log('newVersion:', newVersion);
@@ -19657,12 +19783,7 @@ class GitFlow extends Plugin {
   }
 
   execGitFlowAction(actoin) {
-    const {
-      matchPolicies
-    } = this.getContext();
-    const startOrFinish = actoin[1];
-    this.options;
-    child_process.execSync(`git flow ${actoin[0]} ${startOrFinish}${startOrFinish === 'finish' && matchPolicies.finArgs ? this.convertfinArgs(matchPolicies.finArgs) : ''} ${actoin[2]}`, {
+    child_process.execSync(`git flow ${actoin[0]} ${actoin[1]}${actoin[3] ? `${actoin[3]}` : ''} ${actoin[2]}`, {
       stdio: 'inherit'
     });
   }
@@ -19691,16 +19812,11 @@ class GitFlow extends Plugin {
 
         if (matchPrefixAndPolicies) {
           choices.push({
-            name: `release on develop${gfConfig.develop === 'develop' ? '' : `(${gfConfig.develop})`} ${chalk.reset.dim('(bump, commit and finish current)')}`,
+            name: `release on develop${gfConfig.develop === 'develop' ? '' : `(${gfConfig.develop})`} ${chalk.dim('(bump, commit and finish current)')}`,
             value: {
               type: 'develop',
               ...matchPrefixAndPolicies
-            } // value: [
-            //   'feature',
-            //   'finish',
-            //   this.getStartedName(gitCurrentBranch, gfConfig[gfCurrent])
-            // ]
-
+            }
           });
         }
 
@@ -19945,104 +20061,33 @@ class GitFlow extends Plugin {
     //   tagDependsOnCommit = true
     // releaseDependsOnPush = true
     // } = this.options;
+    // Git.prototype.release = async function() {
+    //   const { commit, tag, push } = this.options;
+    //   let isCommit = false;
+    //   await this.step({
+    //     enabled: commit,
+    //     task: () => {
+    //       isCommit = true;
+    //       this.commit();
+    //     },
+    //     label: 'Git commit',
+    //     prompt: 'commit'
+    //   });
+    //   if (tagDependsOnCommit && isCommit)
+    //     await this.step({
+    //       enabled: isCommit,
+    //       task: () => this.tag(),
+    //       label: 'Git tag',
+    //       prompt: 'tag'
+    //     });
+    //   await this.step({
+    //     enabled: push,
+    //     task: () => this.push(),
+    //     label: 'Git push',
+    //     prompt: 'push'
+    //   });
+    // };
 
-
-    Git.prototype.release = async function () {
-      switch (gitCurrentBranch.split('/')[0]) {
-        case 'feature':
-          // this.commit();
-          const prompts = {
-            finArgs: {
-              type: 'checkbox',
-              message: () => 'Select options to finish feature:',
-              choices: () => [{
-                name: '-r rebase instead of merge',
-                value: 'r'
-              }, {
-                name: '-F fetch from $ORIGIN before performing finish',
-                value: 'F'
-              }, {
-                name: '-k keep branch after performing finish',
-                value: 'k'
-              }, {
-                name: '-D force delete feature branch after finish',
-                value: 'D'
-              }, {
-                name: 'S squash feature during merge',
-                value: 'S'
-              }],
-              default: [],
-              pageSize: 9
-            },
-            finishOptions: {
-              type: 'input',
-              message: () => `Please enter a valid tag:`,
-              transformer: context => input => {
-                return semver.validRange(input) ? chalk.redBright(input) : chalk.green(input);
-              },
-              validate: input => semver.validRange(input) ? 'Tag name must not be a valid SemVer range.' : true
-            }
-          };
-          this.registerPrompts(prompts);
-          await this.step({
-            task: () => {
-              isCommit = true;
-              this.commit();
-            },
-            label: 'Finish feature',
-            prompt: 'finishfeature'
-          });
-          child_process.execSync(`git flow feature finish`, {
-            stdio: 'inherit'
-          });
-          break;
-
-        case 'release':
-          child_process.execSync(`git flow release finish`, {
-            stdio: 'inherit'
-          });
-          break;
-
-        case 'hotfix':
-          child_process.execSync(`git flow release finish`, {
-            stdio: 'inherit'
-          });
-          break;
-
-        default:
-          this.commit();
-          this.tag();
-          break;
-      }
-
-      const {
-        commit,
-        tag,
-        push
-      } = this.options;
-      let isCommit = false;
-      await this.step({
-        enabled: commit,
-        task: () => {
-          isCommit = true;
-          this.commit();
-        },
-        label: 'Git commit',
-        prompt: 'commit'
-      });
-      if (tagDependsOnCommit && isCommit) await this.step({
-        enabled: isCommit,
-        task: () => this.tag(),
-        label: 'Git tag',
-        prompt: 'tag'
-      });
-      await this.step({
-        enabled: push,
-        task: () => this.push(),
-        label: 'Git push',
-        prompt: 'push'
-      });
-    };
 
     const npmTags = this.getContext().policy.npmTags;
 
