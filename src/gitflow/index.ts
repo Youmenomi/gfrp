@@ -981,6 +981,8 @@ export default class GitFlow extends Plugin {
       gfSelectGitFlowCommandArgs,
       gfEnterStartOrFinishName
     } = this;
+
+    const yy = this;
     // const {
     //   tagDependsOnCommit = true
     // releaseDependsOnPush = true
@@ -1003,8 +1005,8 @@ export default class GitFlow extends Plugin {
           // if (isCommit) {
           // } else {
           // }
-          execGitFlowAction(
-            await gfSelectGitFlowCommandArgs([
+          yy.execGitFlowAction(
+            await yy.gfSelectGitFlowCommandArgs([
               'feature',
               'finish',
               gitCurrentBranch.split('/')[1]

@@ -20058,12 +20058,7 @@ class GitFlow extends Plugin {
         });
         return;
     }
-
-    const {
-      execGitFlowAction,
-      gfSelectGitFlowCommandArgs,
-      gfEnterStartOrFinishName
-    } = this; // const {
+    const yy = this; // const {
     //   tagDependsOnCommit = true
     // releaseDependsOnPush = true
     // } = this.options;
@@ -20088,7 +20083,7 @@ class GitFlow extends Plugin {
           // if (isCommit) {
           // } else {
           // }
-          execGitFlowAction((await gfSelectGitFlowCommandArgs(['feature', 'finish', gitCurrentBranch.split('/')[1]])));
+          yy.execGitFlowAction((await yy.gfSelectGitFlowCommandArgs(['feature', 'finish', gitCurrentBranch.split('/')[1]])));
           break;
       }
 
